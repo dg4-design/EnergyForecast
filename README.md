@@ -1,0 +1,44 @@
+# Energy Forecast
+
+電気使用量データを可視化するアプリケーション
+
+## セットアップ
+
+1. 依存関係をインストール:
+
+```bash
+npm install
+```
+
+2. 環境変数の設定:
+
+ルートディレクトリに `.env` ファイルを作成し、以下の環境変数を設定してください:
+
+```
+# アカウント認証情報
+VITE_EMAIL=your-email@example.com
+VITE_PASSWORD=your-password
+VITE_ACCOUNT_NUMBER=your-account-number
+```
+
+これらの環境変数は自動ログイン処理に使用されます。
+
+3. 開発サーバーを起動:
+
+```bash
+npm run dev
+```
+
+## 機能
+
+- 電気使用量データの時系列グラフ表示
+- 日付範囲選択によるデータフィルタリング
+- 環境変数を使った自動ログイン
+
+## 技術スタック
+
+- React
+- TypeScript
+- Vite
+- Chart.js
+- Emotion (CSS-in-JS)
