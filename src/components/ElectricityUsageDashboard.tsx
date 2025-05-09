@@ -4,6 +4,7 @@ import { apiService, HalfHourlyReading } from "../services/api"; // api.ts の�
 import { getNowJST } from "../utils/dateUtils";
 import { startOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addDays, subMonths, addMonths, subYears, addYears, addWeeks, subWeeks } from "date-fns";
 import { cacheService } from "../utils/cacheUtils";
+import MonthlyUsageForecast from "./MonthlyUsageForecast"; // 新しいコンポーネントをインポート
 
 // ヘルパー関数: 指定された日付とビュータイプに基づいて次の日付を計算
 const calculateNextDate = (date: Date, viewType: ViewType): Date => {
@@ -373,6 +374,9 @@ const ElectricityUsageDashboard = ({ accountNumber, isLoggedIn }: ElectricityUsa
         isLoadingNext={isNextLoading}
         isLoadingPrev={isPrevLoading}
       />
+
+      {/* 月表示の場合のみ月間使用量予測を表示 */}
+      {viewType === "month" && <MonthlyUsageForecast data={usageData} currentDate={currentDate} isLoading={isDataLoading} />}
     </>
   );
 };

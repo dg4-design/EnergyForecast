@@ -1,6 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3498db"
-  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path
-    d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z">
-  </path>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 128 128">
+  <!-- Generator: Adobe Illustrator 29.5.0, SVG Export Plug-In . SVG Version: 2.1.0 Build 137)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #00d3d3;
+      }
+    </style>
+  </defs>
+  <polygon class="st0" points="88.2 6.5 23.7 71 43.6 71 88.2 26.4 88.2 6.5"/>
+  <polygon class="st0" points="84.4 57 39.8 101.6 39.8 121.5 104.3 57 84.4 57"/>
 </svg>
