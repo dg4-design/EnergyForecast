@@ -1,5 +1,5 @@
 import { css } from "@emotion/react";
-import { useEffect, useRef /* useState */ } from "react"; // useState は App.tsx に移動
+import { useEffect, useRef, useState } from "react"; // useState を import に追加
 import * as d3 from "d3";
 import { HalfHourlyReading } from "../services/api";
 import { toJST } from "../utils/dateUtils";
@@ -139,6 +139,7 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
   // const [viewType, setViewType] = useState<ViewType>("day"); // App.tsx に移動
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [totalUsage, setTotalUsage] = useState<number>(0); // 合計値を保持するstate
 
   // 日毎にデータをグループ化する関数
   const groupByDay = (readings: HalfHourlyReading[]) => {
@@ -354,6 +355,10 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
     if (!data || data.length === 0 || !svgRef.current) return;
 
     const formattedData = formatData();
+
+    // 表示期間の合計値を計算してstateを更新
+    const newTotalValue = formattedData.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+    setTotalUsage(newTotalValue);
 
     // SVGをクリア
     d3.select(svgRef.current).selectAll("*").remove();
@@ -733,6 +738,17 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
           </button>
         </div>
 
+        <div
+          css={css`
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #333;
+          `}
+        >
+          合計: {totalUsage.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh
+        </div>
+
         <div css={styles.chartContainer}>
           <div css={styles.noData}>データがありません</div>
         </div>
@@ -767,6 +783,17 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
         <button css={styles.navButton} onClick={() => onNavigateDate("next")} disabled={isLoadingNext || !hasNextData}>
           次へ
         </button>
+      </div>
+
+      <div
+        css={css`
+          text-align: center;
+          margin-bottom: 10px;
+          font-size: 14px;
+          color: #333;
+        `}
+      >
+        {totalUsage.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh
       </div>
 
       <div css={styles.chartContainer} ref={containerRef}>
