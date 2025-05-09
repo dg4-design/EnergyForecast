@@ -4,6 +4,7 @@ import { HalfHourlyReading } from "../services/api";
 import { format, getDaysInMonth, getDate, startOfMonth, endOfMonth, isAfter, isBefore, isEqual } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toJST } from "../utils/dateUtils";
+import * as commonStyles from "../styles/commonStyles";
 
 // 電力量料金（円/kWh）
 const ELECTRICITY_RATE = 37.2;
@@ -15,32 +16,9 @@ interface MonthlyUsageForecastProps {
 }
 
 const styles = {
-  forecastContainer: css`
-    margin-top: var(--space-6);
-    width: 100%;
-    max-width: 800px;
-    margin-left: auto;
-    margin-right: auto;
-    padding: var(--space-6);
-    background-color: var(--background-card);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border-light);
-  `,
-  sectionTitle: css`
-    font-size: var(--text-lg);
-    font-weight: 600;
-    margin-bottom: var(--space-4);
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  `,
-  titleIcon: css`
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-  `,
+  forecastContainer: commonStyles.cardContainer,
+  sectionTitle: commonStyles.sectionTitle,
+  titleIcon: commonStyles.titleIcon,
   forecastContent: css`
     display: flex;
     flex-direction: row;
@@ -61,11 +39,6 @@ const styles = {
     text-align: center;
     border: 1px solid var(--border-light);
     transition: transform var(--transition-fast);
-
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-sm);
-    }
   `,
   forecastLabel: css`
     font-weight: 500;
@@ -78,21 +51,8 @@ const styles = {
     color: var(--accent);
     font-size: var(--text-xl);
   `,
-  forecastDescription: css`
-    margin-top: var(--space-4);
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    line-height: 1.6;
-    background-color: var(--gray-50);
-    padding: var(--space-4);
-    border-radius: var(--radius);
-    border: 1px solid var(--border-light);
-  `,
-  loading: css`
-    color: var(--text-secondary);
-    text-align: center;
-    padding: var(--space-6);
-  `,
+  forecastDescription: commonStyles.descriptionText,
+  loading: commonStyles.loadingMessage,
   progressContainer: css`
     margin-top: var(--space-4);
     background-color: var(--gray-100);
@@ -114,17 +74,7 @@ const styles = {
     font-size: var(--text-xs);
     color: var(--text-tertiary);
   `,
-  monthLabel: css`
-    display: inline-flex;
-    align-items: center;
-    background-color: var(--teal-100);
-    color: var(--teal-700);
-    padding: var(--space-1) var(--space-3);
-    border-radius: var(--radius-full);
-    font-size: var(--text-xs);
-    font-weight: 500;
-    margin-left: var(--space-2);
-  `,
+  monthLabel: commonStyles.monthLabel,
 };
 
 const MonthlyUsageForecast = ({ data, currentDate, isLoading }: MonthlyUsageForecastProps) => {
@@ -186,79 +136,53 @@ const MonthlyUsageForecast = ({ data, currentDate, isLoading }: MonthlyUsageFore
     });
   }, [data, currentDate, isLoading]);
 
-  if (isLoading) {
-    return (
-      <div css={styles.forecastContainer}>
-        <h3 css={styles.sectionTitle}>
-          <svg css={styles.titleIcon} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-            <polygon fill="var(--accent)" points="84.4 57 39.8 101.6 39.8 121.5 104.3 57 84.4 57" />
-          </svg>
-          月間使用量予測
-        </h3>
-        <div css={styles.loading}>読み込み中...</div>
-      </div>
-    );
-  }
-
-  if (!forecastData) {
-    return (
-      <div css={styles.forecastContainer}>
-        <h3 css={styles.sectionTitle}>
-          <svg css={styles.titleIcon} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-            <polygon fill="var(--accent)" points="84.4 57 39.8 101.6 39.8 121.5 104.3 57 84.4 57" />
-          </svg>
-          月間使用量予測
-        </h3>
-        <div css={styles.forecastDescription}>データが不足しているため、予測を計算できません。</div>
-      </div>
-    );
-  }
-
+  // 月名を取得
   const monthName = format(currentDate, "M月", { locale: ja });
+
+  // コンテンツ部分のみ条件に応じて変更
+  let contentElement;
+  if (isLoading) {
+    contentElement = <div css={styles.loading}>読み込み中...</div>;
+  } else if (!forecastData) {
+    contentElement = <div css={styles.forecastDescription}>データが不足しているため、予測を計算できません。</div>;
+  } else {
+    contentElement = (
+      <>
+        <div css={styles.forecastContent}>
+          <div css={styles.forecastItem}>
+            <span css={styles.forecastLabel}>日平均使用量</span>
+            <span css={styles.forecastValue}>{forecastData.dailyAverage.toFixed(2)} kWh/日</span>
+          </div>
+
+          <div css={styles.forecastItem}>
+            <span css={styles.forecastLabel}>月間予測使用量</span>
+            <span css={styles.forecastValue}>{forecastData.monthlyForecast.toFixed(2)} kWh</span>
+          </div>
+
+          <div css={styles.forecastItem}>
+            <span css={styles.forecastLabel}>月間予測使用料金</span>
+            <span css={styles.forecastValue}>{forecastData.forecastCost.toLocaleString()} 円</span>
+          </div>
+        </div>
+
+        <div css={styles.forecastDescription}>
+          {monthName}の最初から今日までの平均使用量を元に、月末までの合計使用量を予測しています。
+          <br />
+          予測使用料金は{ELECTRICITY_RATE}円/kWhで計算しています。
+          <br />
+          実際の使用量や料金は生活パターンや天候などの影響により変動する可能性があります。
+        </div>
+      </>
+    );
+  }
 
   return (
     <div css={styles.forecastContainer}>
       <h3 css={styles.sectionTitle}>
-        <svg css={styles.titleIcon} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-          <polygon fill="var(--accent)" points="84.4 57 39.8 101.6 39.8 121.5 104.3 57 84.4 57" />
-        </svg>
         月間使用量予測
         <span css={styles.monthLabel}>{monthName}</span>
       </h3>
-
-      <div css={styles.forecastContent}>
-        <div css={styles.forecastItem}>
-          <span css={styles.forecastLabel}>日平均使用量</span>
-          <span css={styles.forecastValue}>{forecastData.dailyAverage.toFixed(2)} kWh/日</span>
-        </div>
-
-        <div css={styles.forecastItem}>
-          <span css={styles.forecastLabel}>月間予測使用量</span>
-          <span css={styles.forecastValue}>{forecastData.monthlyForecast.toFixed(2)} kWh</span>
-        </div>
-
-        <div css={styles.forecastItem}>
-          <span css={styles.forecastLabel}>月間予測電力量料金</span>
-          <span css={styles.forecastValue}>{forecastData.forecastCost.toLocaleString()} 円</span>
-        </div>
-      </div>
-
-      <div css={styles.progressContainer}>
-        <div css={styles.progressBar} style={{ width: `${Math.min(forecastData.progressPercentage, 100)}%` }} />
-      </div>
-
-      <div css={styles.progressLabel}>
-        <span>1日</span>
-        <span>{forecastData.daysInMonth}日</span>
-      </div>
-
-      <div css={styles.forecastDescription}>
-        {monthName}の最初から今日までの平均使用量を元に、月末までの合計使用量を予測しています。
-        <br />
-        電力量料金は{ELECTRICITY_RATE}円/kWhで計算しています。
-        <br />
-        実際の使用量や料金は生活パターンや天候などの影響により変動する可能性があります。
-      </div>
+      {contentElement}
     </div>
   );
 };
