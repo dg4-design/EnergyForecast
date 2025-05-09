@@ -1,30 +1,40 @@
-import axios from "axios";
+import axios, { AxiosError, AxiosRequestConfig } from "axios";
 import { ElectricityUsageParams, LoginInput, RefreshTokenInput, HalfHourlyReading } from "../types/api";
 
-const API_URL = "https://api.oejp-kraken.energy/v1/graphql/"; // 正しいAPIエンドポイント
+const API_URL = "https://api.oejp-kraken.energy/v1/graphql/";
 
-// デバッグ用：APIリクエストの詳細をコンソールに出力する関数
-function logApiRequest(operation: string, query: string, variables: any, headers?: any) {
-  console.group(`--- API ${operation}リクエスト ---`);
-  console.log("URL:", API_URL);
-  console.log("クエリ:", query);
-  console.log("変数:", JSON.stringify(variables, null, 2));
-  if (headers) {
-    // トークンは一部だけ表示（セキュリティのため）
-    const sanitizedHeaders = { ...headers };
-    if (sanitizedHeaders.Authorization) {
-      sanitizedHeaders.Authorization = sanitizedHeaders.Authorization.substring(0, 20) + "...";
+// Axiosインスタンスを作成
+const axiosInstance = axios.create({
+  baseURL: API_URL,
+});
+
+let isRefreshing = false;
+let failedQueue: { resolve: (value?: any) => void; reject: (reason?: any) => void; config: AxiosRequestConfig }[] = [];
+
+const processQueue = (error: Error | null, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      if (prom.config.headers) {
+        prom.config.headers["Authorization"] = token;
+      }
+      axiosInstance(prom.config).then(prom.resolve).catch(prom.reject);
     }
-    console.log("ヘッダー:", sanitizedHeaders);
-  }
-  console.groupEnd();
-}
+  });
+  failedQueue = [];
+};
 
+// ApiServiceのインスタンスでトークンを管理する
 class ApiService {
-  private token: string | null = null;
-  private refreshToken: string | null = null;
+  public token: string | null = null; // public に変更してインターセプターからアクセス可能に
+  public refreshToken: string | null = null; // public に変更
+  private onAuthError: (() => void) | null = null;
 
-  // ログインしてトークンを取得
+  setAuthErrorHandler(handler: () => void) {
+    this.onAuthError = handler;
+  }
+
   async login(credentials: LoginInput): Promise<void> {
     const loginMutation = `
       mutation login($input: ObtainJSONWebTokenInput!) {
@@ -34,38 +44,27 @@ class ApiService {
         }
       }
     `;
-
-    const variables = {
-      input: credentials,
-    };
-
-    // リクエスト情報をログに出力
-    logApiRequest("ログイン", loginMutation, variables);
-
+    const variables = { input: credentials };
     try {
-      const response = await axios.post(API_URL, {
+      const response = await axiosInstance.post("", {
         query: loginMutation,
         variables: variables,
       });
-
-      // APIレスポンスをコンソールに出力
-      console.log("ログインAPIレスポンス:", JSON.stringify(response.data));
-
-      // レスポンス構造のチェック
-      if (response.data && response.data.data && response.data.data.obtainKrakenToken) {
+      if (response.data?.data?.obtainKrakenToken) {
         this.token = response.data.data.obtainKrakenToken.token;
         this.refreshToken = response.data.data.obtainKrakenToken.refreshToken;
+        if (axiosInstance.defaults.headers.common) {
+          axiosInstance.defaults.headers.common["Authorization"] = this.token;
+        }
       } else {
-        // APIエラーの詳細を表示
         console.error("APIレスポンスにトークンが含まれていません:", response.data);
-        if (response.data && response.data.errors) {
+        if (response.data?.errors) {
           console.error("APIエラー詳細:", response.data.errors);
         }
         throw new Error("ログインに失敗しました");
       }
     } catch (error) {
       console.error("ログインエラー:", error);
-      // axios エラーオブジェクトから詳細情報を取得
       if (axios.isAxiosError(error) && error.response) {
         console.error("APIエラーステータス:", error.response.status);
         console.error("APIエラーデータ:", error.response.data);
@@ -74,12 +73,12 @@ class ApiService {
     }
   }
 
-  // リフレッシュトークンを使って新しいトークンを取得
-  async refreshAuthToken(): Promise<void> {
+  async refreshAuthToken(): Promise<string | null> {
     if (!this.refreshToken) {
-      throw new Error("リフレッシュトークンがありません");
+      console.error("リフレッシュトークンがありません");
+      if (this.onAuthError) this.onAuthError();
+      return null;
     }
-
     const refreshMutation = `
       mutation login($input: ObtainJSONWebTokenInput!) {
         obtainKrakenToken(input: $input) {
@@ -88,58 +87,39 @@ class ApiService {
         }
       }
     `;
-
-    const variables = {
-      input: {
-        refreshToken: this.refreshToken,
-      } as RefreshTokenInput,
-    };
-
-    // リクエスト情報をログに出力
-    logApiRequest("トークンリフレッシュ", refreshMutation, variables);
-
+    const variables = { input: { refreshToken: this.refreshToken } as RefreshTokenInput };
     try {
-      console.log("トークンリフレッシュを試みています...");
-
-      const response = await axios.post(API_URL, {
+      const response = await axiosInstance.post("", {
         query: refreshMutation,
         variables: variables,
       });
-
-      // APIレスポンスをコンソールに出力
-      console.log("リフレッシュAPIレスポンス:", JSON.stringify(response.data));
-
-      // レスポンス構造のチェック
-      if (response.data && response.data.data && response.data.data.obtainKrakenToken) {
+      if (response.data?.data?.obtainKrakenToken) {
         this.token = response.data.data.obtainKrakenToken.token;
         this.refreshToken = response.data.data.obtainKrakenToken.refreshToken;
-        console.log("トークンリフレッシュ成功");
-      } else {
-        // APIエラーの詳細を表示
-        console.error("APIレスポンスにトークンが含まれていません:", response.data);
-        if (response.data && response.data.errors) {
-          console.error("APIエラー詳細:", response.data.errors);
+        if (axiosInstance.defaults.headers.common) {
+          axiosInstance.defaults.headers.common["Authorization"] = this.token;
         }
+        return this.token;
+      } else {
+        console.error("APIレスポンスにトークンが含まれていません (リフレッシュ):", response.data);
+        if (response.data?.errors) {
+          console.error("APIエラー詳細 (リフレッシュ):", response.data.errors);
+        }
+        if (this.onAuthError) this.onAuthError();
         throw new Error("トークンリフレッシュに失敗しました");
       }
     } catch (error) {
       console.error("トークン更新エラー:", error);
-      // axios エラーオブジェクトから詳細情報を取得
       if (axios.isAxiosError(error) && error.response) {
         console.error("APIリフレッシュエラーステータス:", error.response.status);
         console.error("APIリフレッシュエラーデータ:", error.response.data);
       }
+      if (this.onAuthError) this.onAuthError();
       throw error;
     }
   }
 
-  // 電気使用量データを取得
   async getElectricityUsage(params: ElectricityUsageParams): Promise<HalfHourlyReading[]> {
-    if (!this.token) {
-      throw new Error("認証トークンがありません。先にログインしてください。");
-    }
-
-    // ドキュメントに記載されている正確なクエリとフラグメントを使用
     const usageQuery = `
       query halfHourlyReadings(
         $accountNumber: String!
@@ -163,7 +143,6 @@ class ApiService {
           }
         }
       }
-      
       fragment halfHourlyReading on ElectricityHalfHourReading {
         consumptionRateBand
         consumptionStep
@@ -172,65 +151,86 @@ class ApiService {
         value
       }
     `;
-
-    const headers = {
-      Authorization: this.token,
-    };
-
-    // リクエスト情報をログに出力
-    logApiRequest("使用量データ取得", usageQuery, params, headers);
-
     try {
-      const response = await axios.post(
-        API_URL,
-        {
-          query: usageQuery,
-          variables: params,
-        },
-        {
-          headers: headers,
-        }
-      );
-
-      // レスポンスの構造を安全にチェック
-      console.log("使用量データAPIレスポンス:", JSON.stringify(response.data));
-
-      if (response.data && response.data.data && response.data.data.account) {
-        const account = response.data.data.account;
-
-        if (
-          account.properties &&
-          account.properties.length > 0 &&
-          account.properties[0].electricitySupplyPoints &&
-          account.properties[0].electricitySupplyPoints.length > 0 &&
-          account.properties[0].electricitySupplyPoints[0].halfHourlyReadings
-        ) {
-          return account.properties[0].electricitySupplyPoints[0].halfHourlyReadings;
-        }
-      } else if (response.data && response.data.errors) {
-        // GraphQLエラー情報を表示
+      const response = await axiosInstance.post("", {
+        query: usageQuery,
+        variables: params,
+      });
+      if (response.data?.data?.account?.properties?.[0]?.electricitySupplyPoints?.[0]?.halfHourlyReadings) {
+        return response.data.data.account.properties[0].electricitySupplyPoints[0].halfHourlyReadings;
+      }
+      if (response.data?.errors) {
         console.error("API GraphQLエラー:", response.data.errors);
       }
-
-      // データが見つからない場合は空配列を返す
-      console.log("データが見つかりませんでした。APIレスポンス:", response.data);
       return [];
     } catch (error) {
-      console.error("使用量データ取得エラー:", error);
-      // axios エラーオブジェクトから詳細情報を取得
-      if (axios.isAxiosError(error) && error.response) {
-        console.error("API使用量データエラーステータス:", error.response.status);
-        console.error("API使用量データエラー詳細:", error.response.data);
-      }
+      console.error("使用量データ取得エラー (インターセプター後):", error);
       throw error;
     }
   }
 
-  // トークンの有無をチェック
   hasValidToken(): boolean {
     return !!this.token;
   }
 }
 
 export const apiService = new ApiService();
+
+// リクエストインターセプター
+axiosInstance.interceptors.request.use(
+  (config) => {
+    if (apiService.token && config.headers) {
+      config.headers["Authorization"] = apiService.token; // Bearer プレフィックスはAPI仕様による
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// レスポンスインターセプター
+axiosInstance.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error: AxiosError) => {
+    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean }; // _retry プロパティを追加
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject, config: originalRequest });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const newToken = await apiService.refreshAuthToken();
+        if (newToken) {
+          if (originalRequest.headers) {
+            // headers が存在するか確認
+            originalRequest.headers["Authorization"] = newToken;
+          }
+          processQueue(null, newToken);
+          return axiosInstance(originalRequest);
+        } else {
+          // リフレッシュ失敗時 (onAuthError は refreshAuthToken 内で呼ばれる想定)
+          processQueue(new Error("Token refresh failed and no new token was provided"), null);
+          return Promise.reject(error); // またはカスタムエラーを返す
+        }
+      } catch (refreshError) {
+        processQueue(refreshError as Error, null);
+        // onAuthError は refreshAuthToken 内で呼ばれる想定
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export type { HalfHourlyReading } from "../types/api";
