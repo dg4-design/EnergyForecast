@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import ElectricityUsageChart, { ViewType } from "./ElectricityUsageChart"; // 同じディレクトリなのでパスを調整
 import { apiService, HalfHourlyReading } from "../services/api"; // api.ts の場所に合わせて調整
 import { getNowJST } from "../utils/dateUtils";
 import { startOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addDays, subMonths, addMonths, subYears, addYears, addWeeks, subWeeks } from "date-fns";
+import { cacheService } from "../utils/cacheUtils";
 
 // ヘルパー関数: 指定された日付とビュータイプに基づいて次の日付を計算
 const calculateNextDate = (date: Date, viewType: ViewType): Date => {
@@ -36,7 +37,7 @@ const calculatePrevDate = (date: Date, viewType: ViewType): Date => {
   }
 };
 
-interface ElectricityUsageDashboardProps {
+export interface ElectricityUsageDashboardProps {
   accountNumber: string;
   isLoggedIn: boolean; // isLoggedIn をPropsで受け取る
 }
@@ -52,6 +53,40 @@ const ElectricityUsageDashboard = ({ accountNumber, isLoggedIn }: ElectricityUsa
   const [prevPeriodData, setPrevPeriodData] = useState<HalfHourlyReading[] | null>(null);
   const [isNextLoading, setIsNextLoading] = useState(false);
   const [isPrevLoading, setIsPrevLoading] = useState(false);
+  const initialLoadRef = useRef(true);
+  const initialLoadCompleteRef = useRef(false);
+
+  // キャッシュのクリーンアップを行う関数
+  const cleanupExpiredCache = useCallback(() => {
+    // 現在のキャッシュキーをすべて取得
+    const allKeys = cacheService.getAllCacheKeys();
+
+    // 電力使用量関連のキャッシュキーのみを対象にする
+    const electricityKeys = allKeys.filter((key) => key.startsWith("electricity_usage_"));
+
+    // キーの数が多すぎる場合は、一部を削除（例えば20件以上の場合）
+    if (electricityKeys.length > 20) {
+      // 古いキャッシュから順に削除（cacheServiceにキャッシュの年齢を取得する機能がある場合）
+      // cacheServiceはタイムスタンプを内部で管理しているので、クリアだけ行う
+      electricityKeys.slice(0, electricityKeys.length - 20).forEach((key) => {
+        cacheService.remove(key);
+      });
+    }
+  }, []);
+
+  // コンポーネントマウント時にキャッシュクリーンアップを実行
+  useEffect(() => {
+    if (isLoggedIn && accountNumber) {
+      cleanupExpiredCache();
+    }
+
+    // コンポーネントアンマウント時にもクリーンアップを実行（オプション）
+    return () => {
+      if (isLoggedIn && accountNumber) {
+        cleanupExpiredCache();
+      }
+    };
+  }, [isLoggedIn, accountNumber, cleanupExpiredCache]);
 
   const fetchPeriodData = useCallback(
     async (dateForPeriod: Date, type: ViewType) => {
@@ -101,12 +136,141 @@ const ElectricityUsageDashboard = ({ accountNumber, isLoggedIn }: ElectricityUsa
     [isLoggedIn, accountNumber]
   );
 
+  // パラメータからAPIリクエストのキーを生成するヘルパー関数
+  const generateCacheKey = useCallback(
+    (date: Date, type: ViewType): string => {
+      let fromDate: Date;
+      let toDate: Date;
+
+      switch (type) {
+        case "day":
+          fromDate = startOfDay(subDays(date, 1));
+          toDate = startOfDay(date);
+          break;
+        case "week":
+          fromDate = startOfWeek(date, { weekStartsOn: 0 });
+          toDate = endOfWeek(date, { weekStartsOn: 0 });
+          break;
+        case "month":
+          fromDate = startOfMonth(date);
+          toDate = endOfMonth(date);
+          break;
+        case "year":
+          fromDate = startOfYear(date);
+          toDate = endOfYear(date);
+          const now = new Date();
+          if (toDate > now) {
+            toDate = now;
+          }
+          break;
+        default:
+          throw new Error(`Unknown viewType: ${type}`);
+      }
+
+      const params = {
+        accountNumber,
+        fromDatetime: fromDate.toISOString(),
+        toDatetime: toDate.toISOString(),
+        viewType: type, // viewTypeをキーに追加して、同じ日付範囲でもビュータイプが違えば別のキャッシュとして保存する
+      };
+
+      return `electricity_usage_${JSON.stringify(params)}`;
+    },
+    [accountNumber]
+  );
+
+  // ページ読み込み時にキャッシュをチェックする
   useEffect(() => {
-    if (!isLoggedIn || !accountNumber) return;
+    if (initialLoadRef.current && isLoggedIn && accountNumber) {
+      initialLoadRef.current = false;
+
+      // 現在の表示タイプと日付に基づいてキャッシュをチェック
+      const checkCacheForCurrentView = async () => {
+        try {
+          const cacheKey = generateCacheKey(currentDate, viewType);
+          const cachedData = cacheService.get<HalfHourlyReading[]>(cacheKey);
+
+          if (cachedData) {
+            // キャッシュからのデータをセット
+            setUsageData(cachedData);
+            setDisplayedDate(new Date(currentDate.getTime()));
+            setDisplayedViewType(viewType);
+
+            // グラフの強制再描画のために一時的にローディング状態にする
+            setIsDataLoading(true);
+            setTimeout(() => {
+              setIsDataLoading(false);
+            }, 10);
+
+            // 次と前のデータも先にキャッシュをチェック
+            const nextDateToFetch = calculateNextDate(currentDate, viewType);
+            const prevDateToFetch = calculatePrevDate(currentDate, viewType);
+
+            // 次のデータのキャッシュをチェック
+            const nextCacheKey = generateCacheKey(nextDateToFetch, viewType);
+            const nextCachedData = cacheService.get<HalfHourlyReading[]>(nextCacheKey);
+            if (nextCachedData) {
+              setNextPeriodData(nextCachedData);
+            } else {
+              // キャッシュがなければ非同期でフェッチ
+              fetchPeriodData(nextDateToFetch, viewType).then((data) => {
+                if (data) setNextPeriodData(data);
+              });
+            }
+
+            // 前のデータのキャッシュをチェック
+            const prevCacheKey = generateCacheKey(prevDateToFetch, viewType);
+            const prevCachedData = cacheService.get<HalfHourlyReading[]>(prevCacheKey);
+            if (prevCachedData) {
+              setPrevPeriodData(prevCachedData);
+            } else {
+              // キャッシュがなければ非同期でフェッチ
+              fetchPeriodData(prevDateToFetch, viewType).then((data) => {
+                if (data) setPrevPeriodData(data);
+              });
+            }
+          } else {
+            // キャッシュがなければ通常のデータロードを行う
+            setIsDataLoading(true);
+            const mainData = await fetchPeriodData(currentDate, viewType);
+            if (mainData) {
+              setUsageData(mainData);
+              setDisplayedDate(new Date(currentDate.getTime()));
+              setDisplayedViewType(viewType);
+            }
+            setIsDataLoading(false);
+
+            // 次と前のデータも非同期でロード
+            const nextDateToFetch = calculateNextDate(currentDate, viewType);
+            const prevDateToFetch = calculatePrevDate(currentDate, viewType);
+
+            fetchPeriodData(nextDateToFetch, viewType).then((data) => {
+              if (data) setNextPeriodData(data);
+            });
+
+            fetchPeriodData(prevDateToFetch, viewType).then((data) => {
+              if (data) setPrevPeriodData(data);
+            });
+          }
+        } finally {
+          // 初回ロード完了を示すフラグをセット
+          initialLoadCompleteRef.current = true;
+        }
+      };
+
+      checkCacheForCurrentView();
+    }
+  }, [isLoggedIn, accountNumber, currentDate, viewType, fetchPeriodData, generateCacheKey]);
+
+  // メインのデータロード処理（初回ロード以外）
+  useEffect(() => {
+    // 初回ロードの処理が完了していない場合は何もしない
+    if (!initialLoadCompleteRef.current || !isLoggedIn || !accountNumber) return;
 
     let isMounted = true;
 
     const loadData = async () => {
+      // 表示中のデータが現在の日付・ビュータイプと一致しない場合はデータをロード
       if (currentDate.getTime() !== displayedDate?.getTime() || viewType !== displayedViewType) {
         setIsDataLoading(true);
         const mainData = await fetchPeriodData(currentDate, viewType);
@@ -118,10 +282,9 @@ const ElectricityUsageDashboard = ({ accountNumber, isLoggedIn }: ElectricityUsa
           }
           setIsDataLoading(false);
         }
-      } else {
-        // メインデータは最新
       }
 
+      // メインデータの表示が確定したら次/前のデータをバックグラウンドでロード
       if (isMounted && displayedDate && currentDate.getTime() === displayedDate.getTime() && viewType === displayedViewType) {
         setIsNextLoading(true);
         const nextDateToFetch = calculateNextDate(currentDate, viewType);
@@ -156,6 +319,9 @@ const ElectricityUsageDashboard = ({ accountNumber, isLoggedIn }: ElectricityUsa
     setViewType(newViewType);
     setNextPeriodData(null);
     setPrevPeriodData(null);
+
+    // ビュータイプが変更された時にキャッシュクリーンアップを実行
+    cleanupExpiredCache();
   };
 
   const handleNavigateDate = (direction: "prev" | "next") => {
@@ -176,6 +342,9 @@ const ElectricityUsageDashboard = ({ accountNumber, isLoggedIn }: ElectricityUsa
     } else {
       setCurrentDate(targetDate);
     }
+
+    // 日付が変更された時にもキャッシュクリーンアップを実行
+    cleanupExpiredCache();
   };
 
   if (!isLoggedIn) {
@@ -192,6 +361,7 @@ const ElectricityUsageDashboard = ({ accountNumber, isLoggedIn }: ElectricityUsa
           <div css={styles.formContainer}> ... </div>
       */}
       <ElectricityUsageChart
+        key={`chart-${viewType}-${currentDate.getTime()}-${usageData.length}`}
         data={usageData}
         isLoading={isDataLoading}
         viewType={viewType}

@@ -1,5 +1,5 @@
 import { css } from "@emotion/react";
-import { useEffect, useRef, useState } from "react"; // useState を import に追加
+import { useEffect, useRef, useState, useLayoutEffect } from "react"; // useLayoutEffectを追加
 import * as d3 from "d3";
 import { HalfHourlyReading } from "../services/api";
 import { toJST } from "../utils/dateUtils";
@@ -140,14 +140,44 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [totalUsage, setTotalUsage] = useState<number>(0); // 合計値を保持するstate
+  const [isMounted, setIsMounted] = useState(false); // SVG要素のマウント状態を追跡
+  const [windowResized, setWindowResized] = useState(0); // ウィンドウリサイズを追跡するカウンター
+
+  // 初回レンダリング後にマウント状態を更新
+  useLayoutEffect(() => {
+    if (svgRef.current && containerRef.current) {
+      setIsMounted(true);
+    }
+  }, []);
+
+  // リサイズイベントリスナーの設定
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowResized((prev) => prev + 1);
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    // 初回レンダリング時にも遅延実行で描画を試みる
+    const timer = setTimeout(() => {
+      setWindowResized((prev) => prev + 1);
+    }, 200);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      clearTimeout(timer);
+    };
+  }, []);
 
   // 日毎にデータをグループ化する関数
   const groupByDay = (readings: HalfHourlyReading[]) => {
     const grouped: Record<string, number> = {};
 
     readings.forEach((reading) => {
+      // startAtがDateオブジェクトかstring型かをチェック
+      const startDate = reading.startAt instanceof Date ? reading.startAt : new Date(reading.startAt);
       // UTCからJSTに変換
-      const jstDate = toJST(new Date(reading.startAt));
+      const jstDate = toJST(startDate);
       // 日本時間の年月日を文字列として保持（UTCに戻さない）
       const dateKey = format(jstDate, "M月d日", { locale: ja });
 
@@ -169,8 +199,10 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
     const grouped: Record<string, number> = {};
 
     readings.forEach((reading) => {
+      // startAtがDateオブジェクトかstring型かをチェック
+      const startDate = reading.startAt instanceof Date ? reading.startAt : new Date(reading.startAt);
       // UTCからJSTに変換
-      const jstDate = toJST(new Date(reading.startAt));
+      const jstDate = toJST(startDate);
       const monthKey = `${jstDate.getFullYear()}年${jstDate.getMonth() + 1}月`;
 
       // 数値に変換して確実に加算
@@ -193,7 +225,9 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
     // 現在の年を取得（ほとんどのケースでreadings内のデータから判断可能）
     let currentYear = new Date().getFullYear();
     if (readings.length > 0) {
-      const firstDate = toJST(new Date(readings[0].startAt));
+      // startAtがDateオブジェクトかstring型かをチェック
+      const startAtValue = readings[0].startAt;
+      const firstDate = toJST(startAtValue instanceof Date ? startAtValue : new Date(startAtValue));
       currentYear = firstDate.getFullYear();
     }
 
@@ -215,8 +249,11 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
       case "day":
         // 30分毎のデータ
         return data.map((item) => {
+          // startAtがDateオブジェクトかstring型かをチェック
+          const startAtValue = item.startAt;
+          const startDate = startAtValue instanceof Date ? startAtValue : new Date(startAtValue);
           // UTCからJSTに変換して表示
-          const jstDate = toJST(new Date(item.startAt));
+          const jstDate = toJST(startDate);
           // 30分後の終了時間を計算
           const endDate = addMinutes(jstDate, 30);
           // 数値に変換して確実に計算
@@ -352,7 +389,21 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
 
   // グラフを描画
   useEffect(() => {
-    if (!data || data.length === 0 || !svgRef.current) return;
+    if (!data || data.length === 0 || !svgRef.current || !containerRef.current) {
+      return;
+    }
+
+    // SVG要素のサイズが0の場合は描画しない
+    const width = svgRef.current.clientWidth;
+    const height = svgRef.current.clientHeight;
+    if (width === 0 || height === 0) {
+      // 再試行タイマーをセット
+      const timer = setTimeout(() => {
+        setWindowResized((prev) => prev + 1);
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
 
     const formattedData = formatData();
 
@@ -360,316 +411,319 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
     const newTotalValue = formattedData.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
     setTotalUsage(newTotalValue);
 
-    // SVGをクリア
-    d3.select(svgRef.current).selectAll("*").remove();
+    try {
+      // SVGをクリア
+      d3.select(svgRef.current).selectAll("*").remove();
 
-    const svg = d3.select(svgRef.current);
+      const svg = d3.select(svgRef.current);
 
-    // SVG要素のサイズを取得
-    const width = svgRef.current.clientWidth;
-    const height = svgRef.current.clientHeight;
+      // SVG要素のサイズを取得
+      const width = svgRef.current.clientWidth || containerRef.current.clientWidth || 700; // デフォルト値を設定
+      const height = svgRef.current.clientHeight || 400; // デフォルト値を設定
 
-    // マージンの設定
-    const margin = { top: 20, right: 30, bottom: 60, left: 60 };
-    const innerWidth = width - margin.left - margin.right;
-    const innerHeight = height - margin.top - margin.bottom;
+      // マージンの設定
+      const margin = { top: 20, right: 30, bottom: 60, left: 80 };
+      const innerWidth = width - margin.left - margin.right;
+      const innerHeight = height - margin.top - margin.bottom;
 
-    // グラフ用のグループ要素を作成
-    const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+      // グラフ用のグループ要素を作成
+      const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // X軸のスケール作成 - データに基づいて作成
-    let xLabels: string[];
+      // X軸のスケール作成 - データに基づいて作成
+      let xLabels: string[];
 
-    if (viewType === "day") {
-      // 日表示の場合は0:00から23:30までの全ての30分間隔を表示
-      xLabels = Array.from({ length: 48 }, (_, i) => {
-        const hour = Math.floor(i / 2);
-        const minute = (i % 2) * 30;
-        const startTime = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-
-        // 30分後の終了時間を計算
-        let endHour = minute === 30 ? hour + 1 : hour;
-        const endMinute = minute === 30 ? 0 : 30;
-
-        // 24時は00時に修正
-        if (endHour === 24) {
-          endHour = 0;
-        }
-
-        const endTime = `${endHour.toString().padStart(2, "0")}:${endMinute.toString().padStart(2, "0")}`;
-        return `${startTime}-${endTime}`;
-      });
-    } else if (viewType === "month") {
-      // 月表示の場合は特別処理：月初から月末まで全ての日を表示
-      const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-      xLabels = Array.from({ length: daysInMonth }, (_, i) => {
-        const day = i + 1;
-        return `${day}日`;
-      });
-    } else {
-      // その他の表示の場合はデータから取得
-      xLabels = formattedData.map((d) => d.label);
-    }
-
-    const x = d3.scaleBand().domain(xLabels).range([0, innerWidth]).padding(0.2);
-
-    // Y軸のスケール作成 - 値が正しく数値型であることを確認
-    const maxValue = d3.max(formattedData, (d) => Number(d.value) || 0) || 0;
-    const y = d3
-      .scaleLinear()
-      .domain([0, maxValue * 1.1])
-      .nice()
-      .range([innerHeight, 0]);
-
-    // X軸を描画 - ティックのみカスタマイズ
-    const xAxis = d3.axisBottom(x);
-
-    // 表示するラベルのカスタマイズ
-    if (viewType === "day") {
-      // 日表示の場合は2時間おきにフィルタリング
-      xAxis.tickFormat((d: string) => {
-        // "HH:mm-HH:mm" 形式から時間のみを取得
-        const startTime = d.split("-")[0];
-        const hour = parseInt(startTime.split(":")[0]);
-        const minute = parseInt(startTime.split(":")[1]);
-
-        // 偶数時かつ分が0の場合のみ表示
-        if (hour % 2 === 0 && minute === 0) {
-          return `${hour.toString().padStart(2, "0")}:00`;
-        }
-        return ""; // その他は空文字を表示
-      });
-    } else if (viewType === "week") {
-      // 週表示の場合は短い曜日名に変換
-      xAxis.tickFormat((d: string) => {
-        const index = WEEKDAYS.indexOf(d);
-        if (index !== -1) {
-          return SHORT_WEEKDAYS[index];
-        }
-        return d;
-      });
-    } else if (viewType === "month") {
-      // 月表示の場合は「日」を削除し、偶数日はスキップ
-      xAxis.tickFormat((d: string) => {
-        // "N日" 形式から日付だけを取得
-        const dayMatch = d.match(/(\d+)日/);
-        if (dayMatch && dayMatch[1]) {
-          const day = parseInt(dayMatch[1]);
-          // 奇数日か29日か31日の場合のみ表示
-          if (day % 2 === 1 || day === 29 || day === 31) {
-            return day.toString();
-          }
-          return ""; // その他は空文字
-        }
-        return d;
-      });
-    } else if (viewType === "year") {
-      // 年表示の場合は「年」を削除し、月のみ表示する
-      xAxis.tickFormat((d: string) => {
-        // "YYYY年M月" 形式から月だけを取得
-        const monthMatch = d.match(/\d+年(\d+)月/);
-        if (monthMatch && monthMatch[1]) {
-          const month = parseInt(monthMatch[1]);
-          return `${month}月`;
-        }
-        return d;
-      });
-    }
-
-    // X軸を描画
-    const xAxisGroup = g.append("g").attr("transform", `translate(0,${innerHeight})`).call(xAxis);
-
-    xAxisGroup.selectAll("path").style("stroke", "#ccd1d9");
-    xAxisGroup.selectAll("line").style("stroke", "#ccd1d9");
-    xAxisGroup.selectAll("text").style("fill", "#555").style("font-size", "11px");
-
-    // Y軸の描画
-    const yAxisGroup = g.append("g").call(
-      d3.axisLeft(y).tickFormat((d) => {
-        // viewTypeに応じたフォーマットを適用
-        let formattedValue;
-        switch (viewType) {
-          case "day":
-            // 日表示では小数点以下2桁
-            formattedValue = d3.format(".2f")(d);
-            break;
-          case "week":
-            // 週表示では小数点以下1桁
-            formattedValue = d3.format(".1f")(d);
-            break;
-          case "month":
-            // 月表示では整数
-            formattedValue = d3.format(".1f")(d);
-            break;
-          case "year":
-            // 年表示では大きな数値になるため整数
-            formattedValue = d3.format(",.0f")(d);
-            break;
-          default:
-            formattedValue = d;
-        }
-        return `${formattedValue} kWh`;
-      })
-    );
-
-    yAxisGroup.selectAll("path").style("stroke", "#ccd1d9");
-    yAxisGroup.selectAll("line").style("stroke", "#ccd1d9");
-    yAxisGroup.selectAll("text").style("fill", "#555").style("font-size", "11px");
-
-    // Y軸のグリッド線を追加
-    g.append("g")
-      .attr("class", "grid")
-      .call(
-        d3
-          .axisLeft(y)
-          .tickSize(-innerWidth)
-          .tickFormat(() => "")
-      )
-      .selectAll("line")
-      .style("stroke", "#e9ecef")
-      .style("stroke-dasharray", "2,2");
-    g.selectAll("path.domain").remove();
-
-    // タイトルの描画
-    svg
-      .append("text")
-      .attr("x", width / 2)
-      .attr("y", margin.top)
-      .attr("text-anchor", "middle")
-      .style("font-size", "18px")
-      .style("font-weight", "bold")
-      .style("fill", "#333");
-
-    // ツールチップグループを最後に作成（最前面に表示されるようにするため）
-    const tooltip = svg.append("g").attr("class", "tooltip").style("display", "none").attr("pointer-events", "none");
-
-    // ツールチップ背景
-    tooltip
-      .append("rect")
-      .attr("width", 180)
-      .attr("height", 65)
-      .attr("fill", "#ffffff")
-      .attr("stroke", "#dee2e6")
-      .attr("stroke-width", 1)
-      .attr("rx", 6)
-      .attr("ry", 6)
-      .attr("y", -70)
-      .attr("x", -90)
-      .style("box-shadow", "0 1px 3px rgba(0,0,0,0.1)");
-
-    // ラベルテキスト
-    const tooltipLabel = tooltip.append("text").attr("x", -80).attr("y", -48).style("font-size", "13px").style("font-weight", "bold").style("fill", "#333");
-
-    // 値テキスト
-    const tooltipValue = tooltip.append("text").attr("x", -80).attr("y", -28).style("font-size", "13px").style("fill", "#555");
-
-    // ツールチップの表示関数
-    const showTooltip = (event: any, d: DataPoint) => {
-      // 値を確実に数値型にして表示
-      const value = Number(d.value);
-      const formattedValue = isNaN(value) ? "N/A" : value.toFixed(2);
-
-      // ツールチップのテキストを設定
-      tooltipLabel.text(`${formattedValue} kWh`);
-
-      let tooltipInfo = "";
       if (viewType === "day") {
-        tooltipInfo = d.label; // 例: 0:00-0:30
-      } else if (viewType === "week" || viewType === "month") {
-        // 日付を表示（例: 5月4日）
-        const date = d.date;
-        tooltipInfo = format(date, "M月d日", { locale: ja });
-      } else if (viewType === "year") {
-        // 月を表示（例: 5月）
-        const date = d.date;
-        tooltipInfo = format(date, "M月", { locale: ja });
+        // 日表示の場合は0:00から23:30までの全ての30分間隔を表示
+        xLabels = Array.from({ length: 48 }, (_, i) => {
+          const hour = Math.floor(i / 2);
+          const minute = (i % 2) * 30;
+          const startTime = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+
+          // 30分後の終了時間を計算
+          let endHour = minute === 30 ? hour + 1 : hour;
+          const endMinute = minute === 30 ? 0 : 30;
+
+          // 24時は00時に修正
+          if (endHour === 24) {
+            endHour = 0;
+          }
+
+          const endTime = `${endHour.toString().padStart(2, "0")}:${endMinute.toString().padStart(2, "0")}`;
+          return `${startTime}-${endTime}`;
+        });
+      } else if (viewType === "month") {
+        // 月表示の場合は特別処理：月初から月末まで全ての日を表示
+        const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+        xLabels = Array.from({ length: daysInMonth }, (_, i) => {
+          const day = i + 1;
+          return `${day}日`;
+        });
+      } else {
+        // その他の表示の場合はデータから取得
+        xLabels = formattedData.map((d) => d.label);
       }
 
-      tooltipValue.text(tooltipInfo);
+      const x = d3.scaleBand().domain(xLabels).range([0, innerWidth]).padding(0.2);
 
-      // ツールチップの位置を設定 - SVG座標系で直接指定
-      const xPos = margin.left + (x(d.label) || 0) + x.bandwidth() / 2;
-      const yPos = margin.top + y(value); // 棒の上端に配置
+      // Y軸のスケール作成 - 値が正しく数値型であることを確認
+      const maxValue = d3.max(formattedData, (d) => Number(d.value) || 0) || 0;
 
-      // ツールチップを表示して位置を設定
+      const y = d3
+        .scaleLinear()
+        .domain([0, maxValue * 1.1])
+        .nice()
+        .range([innerHeight, 0]);
+
+      // X軸を描画 - ティックのみカスタマイズ
+      const xAxis = d3.axisBottom(x);
+
+      // 表示するラベルのカスタマイズ
+      if (viewType === "day") {
+        // 日表示の場合は2時間おきにフィルタリング
+        xAxis.tickFormat((d: string) => {
+          // "HH:mm-HH:mm" 形式から時間のみを取得
+          const startTime = d.split("-")[0];
+          const hour = parseInt(startTime.split(":")[0]);
+          const minute = parseInt(startTime.split(":")[1]);
+
+          // 偶数時かつ分が0の場合のみ表示
+          if (hour % 2 === 0 && minute === 0) {
+            return `${hour.toString().padStart(2, "0")}:00`;
+          }
+          return ""; // その他は空文字を表示
+        });
+      } else if (viewType === "week") {
+        // 週表示の場合は短い曜日名に変換
+        xAxis.tickFormat((d: string) => {
+          const index = WEEKDAYS.indexOf(d);
+          if (index !== -1) {
+            return SHORT_WEEKDAYS[index];
+          }
+          return d;
+        });
+      } else if (viewType === "month") {
+        // 月表示の場合は「日」を削除し、偶数日はスキップ
+        xAxis.tickFormat((d: string) => {
+          // "N日" 形式から日付だけを取得
+          const dayMatch = d.match(/(\d+)日/);
+          if (dayMatch && dayMatch[1]) {
+            const day = parseInt(dayMatch[1]);
+            // 奇数日か29日か31日の場合のみ表示
+            if (day % 2 === 1 || day === 29 || day === 31) {
+              return day.toString();
+            }
+            return ""; // その他は空文字
+          }
+          return d;
+        });
+      } else if (viewType === "year") {
+        // 年表示の場合は「年」を削除し、月のみ表示する
+        xAxis.tickFormat((d: string) => {
+          // "YYYY年M月" 形式から月だけを取得
+          const monthMatch = d.match(/\d+年(\d+)月/);
+          if (monthMatch && monthMatch[1]) {
+            const month = parseInt(monthMatch[1]);
+            return `${month}月`;
+          }
+          return d;
+        });
+      }
+
+      // X軸を描画
+      const xAxisGroup = g.append("g").attr("transform", `translate(0,${innerHeight})`).call(xAxis);
+
+      xAxisGroup.selectAll("path").style("stroke", "#ccd1d9");
+      xAxisGroup.selectAll("line").style("stroke", "#ccd1d9");
+      xAxisGroup.selectAll("text").style("fill", "#555").style("font-size", "11px");
+
+      // Y軸の描画
+      const yAxisGroup = g.append("g").call(
+        d3.axisLeft(y).tickFormat((d) => {
+          // viewTypeに応じたフォーマットを適用
+          let formattedValue;
+          switch (viewType) {
+            case "day":
+              // 日表示では小数点以下2桁
+              formattedValue = d3.format(".2f")(d);
+              break;
+            case "week":
+              // 週表示では小数点以下1桁
+              formattedValue = d3.format(".1f")(d);
+              break;
+            case "month":
+              // 月表示では整数
+              formattedValue = d3.format(".1f")(d);
+              break;
+            case "year":
+              // 年表示では大きな数値になるため整数
+              formattedValue = d3.format(",.0f")(d);
+              break;
+            default:
+              formattedValue = d;
+          }
+          return `${formattedValue} kWh`;
+        })
+      );
+
+      yAxisGroup.selectAll("path").style("stroke", "#ccd1d9");
+      yAxisGroup.selectAll("line").style("stroke", "#ccd1d9");
+      yAxisGroup.selectAll("text").style("fill", "#555").style("font-size", "11px");
+
+      // Y軸のグリッド線を追加
+      g.append("g")
+        .attr("class", "grid")
+        .call(
+          d3
+            .axisLeft(y)
+            .tickSize(-innerWidth)
+            .tickFormat(() => "")
+        )
+        .selectAll("line")
+        .style("stroke", "#e9ecef")
+        .style("stroke-dasharray", "2,2");
+      g.selectAll("path.domain").remove();
+
+      // タイトルの描画
+      svg
+        .append("text")
+        .attr("x", width / 2)
+        .attr("y", margin.top)
+        .attr("text-anchor", "middle")
+        .style("font-size", "18px")
+        .style("font-weight", "bold")
+        .style("fill", "#333");
+
+      // ツールチップグループを最後に作成（最前面に表示されるようにするため）
+      const tooltip = svg.append("g").attr("class", "tooltip").style("display", "none").attr("pointer-events", "none");
+
+      // ツールチップ背景
       tooltip
-        .raise() // 必ず最前面に表示
-        .attr("transform", `translate(${xPos}, ${yPos})`)
-        .style("display", "block");
-
-      // バーの色を変更してハイライト
-      d3.select(event.target).transition().duration(100).attr("fill", "#2980b9");
-    };
-
-    // ツールチップを隠す関数
-    const hideTooltip = (event: any) => {
-      tooltip.style("display", "none");
-      d3.select(event.target).transition().duration(100).attr("fill", "#3498db");
-    };
-
-    // 棒グラフの描画
-    if (viewType === "day" || viewType === "month") {
-      // 日表示・月表示の場合、全ての時間枠/日付枠を描画し、データがある場所だけ棒を表示
-      // キーを保持するマップを作成
-      const dataMap = new Map();
-
-      formattedData.forEach((d) => {
-        dataMap.set(d.label, d);
-      });
-
-      g.selectAll<SVGRectElement, string>(".bar")
-        .data(xLabels)
-        .enter()
         .append("rect")
-        .attr("class", "bar")
-        .attr("x", (label) => x(label) as number)
-        .attr("width", x.bandwidth())
-        .attr("y", (label) => {
-          const dataPoint = dataMap.get(label);
-          if (!dataPoint) return innerHeight; // データがない場合は高さ0
-          const value = Number(dataPoint.value) || 0;
-          return y(value);
-        })
-        .attr("height", (label) => {
-          const dataPoint = dataMap.get(label);
-          if (!dataPoint) return 0; // データがない場合は高さ0
-          const value = Number(dataPoint.value) || 0;
-          return innerHeight - y(value);
-        })
-        .attr("fill", "#3498db")
-        .attr("rx", 3)
-        .attr("ry", 3)
-        .style("cursor", "pointer")
-        .on("mouseover", (event, label) => {
-          const dataPoint = dataMap.get(label);
-          if (dataPoint) showTooltip(event, dataPoint);
-        })
-        .on("mouseout", hideTooltip);
-    } else {
-      // その他の表示の場合（週表示・年表示）
-      g.selectAll<SVGRectElement, DataPoint>(".bar")
-        .data(formattedData)
-        .enter()
-        .append("rect")
-        .attr("class", "bar")
-        .attr("x", (d) => x(d.label) as number)
-        .attr("width", x.bandwidth())
-        .attr("y", (d) => {
-          const value = Number(d.value) || 0;
-          return y(value);
-        })
-        .attr("height", (d) => {
-          const value = Number(d.value) || 0;
-          return innerHeight - y(value);
-        })
-        .attr("fill", "#3498db")
-        .attr("rx", 3)
-        .attr("ry", 3)
-        .style("cursor", "pointer")
-        .on("mouseover", showTooltip)
-        .on("mouseout", hideTooltip);
-    }
-  }, [data, viewType]);
+        .attr("width", 180)
+        .attr("height", 65)
+        .attr("fill", "#ffffff")
+        .attr("stroke", "#dee2e6")
+        .attr("stroke-width", 1)
+        .attr("rx", 6)
+        .attr("ry", 6)
+        .attr("y", -70)
+        .attr("x", -90)
+        .style("box-shadow", "0 1px 3px rgba(0,0,0,0.1)");
+
+      // ラベルテキスト
+      const tooltipLabel = tooltip.append("text").attr("x", -80).attr("y", -48).style("font-size", "13px").style("font-weight", "bold").style("fill", "#333");
+
+      // 値テキスト
+      const tooltipValue = tooltip.append("text").attr("x", -80).attr("y", -28).style("font-size", "13px").style("fill", "#555");
+
+      // ツールチップの表示関数
+      const showTooltip = (event: any, d: DataPoint) => {
+        // 値を確実に数値型にして表示
+        const value = Number(d.value);
+        const formattedValue = isNaN(value) ? "N/A" : value.toFixed(2);
+
+        // ツールチップのテキストを設定
+        tooltipLabel.text(`${formattedValue} kWh`);
+
+        let tooltipInfo = "";
+        if (viewType === "day") {
+          tooltipInfo = d.label; // 例: 0:00-0:30
+        } else if (viewType === "week" || viewType === "month") {
+          // 日付を表示（例: 5月4日）
+          const date = d.date;
+          tooltipInfo = format(date, "M月d日", { locale: ja });
+        } else if (viewType === "year") {
+          // 月を表示（例: 5月）
+          const date = d.date;
+          tooltipInfo = format(date, "M月", { locale: ja });
+        }
+
+        tooltipValue.text(tooltipInfo);
+
+        // ツールチップの位置を設定 - SVG座標系で直接指定
+        const xPos = margin.left + (x(d.label) || 0) + x.bandwidth() / 2;
+        const yPos = margin.top + y(value); // 棒の上端に配置
+
+        // ツールチップを表示して位置を設定
+        tooltip
+          .raise() // 必ず最前面に表示
+          .attr("transform", `translate(${xPos}, ${yPos})`)
+          .style("display", "block");
+
+        // バーの色を変更してハイライト
+        d3.select(event.target).transition().duration(100).attr("fill", "#2980b9");
+      };
+
+      // ツールチップを隠す関数
+      const hideTooltip = (event: any) => {
+        tooltip.style("display", "none");
+        d3.select(event.target).transition().duration(100).attr("fill", "#3498db");
+      };
+
+      // 棒グラフの描画
+      if (viewType === "day" || viewType === "month") {
+        // 日表示・月表示の場合、全ての時間枠/日付枠を描画し、データがある場所だけ棒を表示
+        // キーを保持するマップを作成
+        const dataMap = new Map();
+
+        formattedData.forEach((d) => {
+          dataMap.set(d.label, d);
+        });
+
+        g.selectAll<SVGRectElement, string>(".bar")
+          .data(xLabels)
+          .enter()
+          .append("rect")
+          .attr("class", "bar")
+          .attr("x", (label) => x(label) as number)
+          .attr("width", x.bandwidth())
+          .attr("y", (label) => {
+            const dataPoint = dataMap.get(label);
+            if (!dataPoint) return innerHeight; // データがない場合は高さ0
+            const value = Number(dataPoint.value) || 0;
+            return y(value);
+          })
+          .attr("height", (label) => {
+            const dataPoint = dataMap.get(label);
+            if (!dataPoint) return 0; // データがない場合は高さ0
+            const value = Number(dataPoint.value) || 0;
+            return innerHeight - y(value);
+          })
+          .attr("fill", "#3498db")
+          .attr("rx", 3)
+          .attr("ry", 3)
+          .style("cursor", "pointer")
+          .on("mouseover", (event, label) => {
+            const dataPoint = dataMap.get(label);
+            if (dataPoint) showTooltip(event, dataPoint);
+          })
+          .on("mouseout", hideTooltip);
+      } else {
+        // その他の表示の場合（週表示・年表示）
+        g.selectAll<SVGRectElement, DataPoint>(".bar")
+          .data(formattedData)
+          .enter()
+          .append("rect")
+          .attr("class", "bar")
+          .attr("x", (d) => x(d.label) as number)
+          .attr("width", x.bandwidth())
+          .attr("y", (d) => {
+            const value = Number(d.value) || 0;
+            return y(value);
+          })
+          .attr("height", (d) => {
+            const value = Number(d.value) || 0;
+            return innerHeight - y(value);
+          })
+          .attr("fill", "#3498db")
+          .attr("rx", 3)
+          .attr("ry", 3)
+          .style("cursor", "pointer")
+          .on("mouseover", showTooltip)
+          .on("mouseout", hideTooltip);
+      }
+    } catch (error) {}
+  }, [data, viewType, currentDate, isMounted, windowResized]); // isMountedとwindowResizedを依存配列に追加
 
   if (isLoading) {
     return (
@@ -797,7 +851,12 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
       </div>
 
       <div css={styles.chartContainer} ref={containerRef}>
-        <svg ref={svgRef} width="100%" height="100%"></svg>
+        <svg
+          ref={svgRef}
+          width="100%"
+          height="100%"
+          style={{ minWidth: "600px", minHeight: "350px" }} // 明示的な最小サイズを設定
+        ></svg>
       </div>
     </div>
   );

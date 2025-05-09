@@ -1,5 +1,6 @@
 import axios, { AxiosError, AxiosRequestConfig } from "axios";
 import { ElectricityUsageParams, LoginInput, RefreshTokenInput, HalfHourlyReading } from "../types/api";
+import { cacheService } from "../utils/cacheUtils";
 
 const API_URL = "https://api.oejp-kraken.energy/v1/graphql/";
 
@@ -120,6 +121,16 @@ class ApiService {
   }
 
   async getElectricityUsage(params: ElectricityUsageParams): Promise<HalfHourlyReading[]> {
+    // キャッシュキーを生成（パラメータをJSON文字列化）
+    const cacheKey = `electricity_usage_${JSON.stringify(params)}`;
+
+    // キャッシュをチェック
+    const cachedData = cacheService.get<HalfHourlyReading[]>(cacheKey);
+    if (cachedData) {
+      return cachedData;
+    }
+
+    // キャッシュがない場合はAPIリクエスト
     const usageQuery = `
       query halfHourlyReadings(
         $accountNumber: String!
@@ -157,7 +168,10 @@ class ApiService {
         variables: params,
       });
       if (response.data?.data?.account?.properties?.[0]?.electricitySupplyPoints?.[0]?.halfHourlyReadings) {
-        return response.data.data.account.properties[0].electricitySupplyPoints[0].halfHourlyReadings;
+        const data = response.data.data.account.properties[0].electricitySupplyPoints[0].halfHourlyReadings;
+        // 結果をキャッシュに保存
+        cacheService.set(cacheKey, data);
+        return data;
       }
       if (response.data?.errors) {
         console.error("API GraphQLエラー:", response.data.errors);

@@ -22,7 +22,7 @@ export interface HalfHourlyReading {
   consumptionRateBand: string;
   consumptionStep: number;
   costEstimate: number;
-  startAt: string;
+  startAt: string | Date;
   value: number;
 }
 

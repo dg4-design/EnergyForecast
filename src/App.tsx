@@ -90,7 +90,7 @@ const App = () => {
   return (
     <div css={styles.container}>
       <header css={styles.header}>
-        <h1 css={styles.title}>電力使用量モニター</h1>
+        <h1 css={styles.title}>EnergyForecast</h1>
       </header>
       <main css={styles.mainContent}>
         <LoginStatusDisplay isLoginLoading={isLoginLoading} isLoggedIn={isLoggedIn} />
