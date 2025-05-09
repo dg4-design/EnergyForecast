@@ -75,7 +75,7 @@ const styles = {
 
     @media (max-width: 768px) {
       margin: var(--space-4) auto;
-      padding: 0 var(--space-3);
+      padding: 0 var(--space-2);
     }
   `,
   // formContainer, dateRangeSelector, dateInputContainer, dateLabel, dateInput, button, statusMessage, loginMessage は移動したので削除

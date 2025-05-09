@@ -5,6 +5,7 @@ import { HalfHourlyReading } from "../services/api";
 import { toJST } from "../utils/dateUtils";
 import { format, parse, addMinutes, startOfWeek, endOfWeek, subDays } from "date-fns"; // 必要な関数を追加
 import { ja } from "date-fns/locale";
+import * as commonStyles from "../styles/commonStyles";
 
 interface ElectricityUsageChartProps {
   data: HalfHourlyReading[];
@@ -34,60 +35,19 @@ const WEEKDAYS = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日
 const SHORT_WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
 const styles = {
-  container: css`
-    width: 100%;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: var(--space-6);
-    background-color: var(--background-card);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border-light);
-  `,
-  header: css`
-    margin-bottom: var(--space-5);
-    font-size: var(--text-xl);
-    font-weight: 600;
-    color: var(--text-primary);
+  container: commonStyles.cardContainer,
+  header: commonStyles.sectionTitle,
+  headerIcon: commonStyles.titleIcon,
+  noData: commonStyles.noDataMessage,
+  loading: commonStyles.loadingMessage,
+  tabAndNavContainer: css`
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: var(--space-2);
-  `,
-  headerIcon: css`
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-  `,
-  noData: css`
-    text-align: center;
-    color: var(--text-secondary);
-    padding: var(--space-8) var(--space-4);
-    background-color: var(--gray-50);
-    border-radius: var(--radius);
-    margin: 0;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: var(--text-base);
-    border: 1px dashed var(--gray-200);
-  `,
-  loading: css`
-    text-align: center;
-    color: var(--text-secondary);
-    padding: var(--space-8) var(--space-4);
-    background-color: var(--gray-50);
-    border-radius: var(--radius);
-    margin: 0;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: var(--text-base);
+    margin-bottom: var(--space-3);
   `,
   tabs: css`
     display: flex;
-    margin-bottom: var(--space-6);
     border-bottom: 1px solid var(--border);
   `,
   tab: css`
@@ -123,9 +83,18 @@ const styles = {
   `,
   navigationContainer: css`
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     margin-bottom: var(--space-4);
+  `,
+  dateDisplayWrapper: css`
+    display: flex;
+    align-items: center;
+  `,
+  navButtonsWrapper: css`
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
   `,
   navButton: css`
     padding: var(--space-2) var(--space-4);
@@ -456,13 +425,20 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
       const svg = d3.select(svgRef.current);
 
       // SVG要素のサイズを取得
-      const width = svgRef.current.clientWidth || containerRef.current.clientWidth || 700; // デフォルト値を設定
-      const height = svgRef.current.clientHeight || 400; // デフォルト値を設定
+      const containerWidth = containerRef.current.clientWidth || 700; // デフォルト値を設定
+      const chartHeight = 400; // 固定の高さ
+
+      // SVGの viewBox と preserveAspectRatio を設定してレスポンシブに
+      svg
+        .attr("viewBox", `0 0 ${containerWidth} ${chartHeight}`)
+        .attr("preserveAspectRatio", "xMidYMid meet")
+        .style("width", "100%") // コンテナの幅に合わせる
+        .style("height", "auto"); // 高さはアスペクト比に応じて自動調整
 
       // マージンの設定
       const margin = { top: 20, right: 30, bottom: 60, left: 80 };
-      const innerWidth = width - margin.left - margin.right;
-      const innerHeight = height - margin.top - margin.bottom;
+      const innerWidth = containerWidth - margin.left - margin.right;
+      const innerHeight = chartHeight - margin.top - margin.bottom;
 
       // グラフ用のグループ要素を作成
       const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
@@ -508,7 +484,7 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
 
       const y = d3
         .scaleLinear()
-        .domain([0, maxValue * 1.1])
+        .domain([0, maxValue * 1.1]) // Y軸の最大値を少し余裕を持たせる
         .nice()
         .range([innerHeight, 0]);
 
@@ -753,139 +729,59 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
     } catch (error) {}
   }, [data, viewType, currentDate, isMounted, windowResized]); // isMountedとwindowResizedを依存配列に追加
 
+  // チャートコンテンツ部分のみ条件に応じて変更
+  let chartContent;
   if (isLoading) {
-    return (
-      <div css={styles.container}>
-        <div css={styles.header}>
-          <svg css={styles.headerIcon} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-            <polygon fill="var(--accent)" points="88.2 6.5 23.7 71 43.6 71 88.2 26.4 88.2 6.5" />
-          </svg>
-          電気使用量グラフ
-        </div>
-
-        <div css={styles.tabs}>
-          <div css={[styles.tab, viewType === "day" && styles.activeTab]} onClick={() => onViewTypeChange("day")}>
-            日
-          </div>
-          <div css={[styles.tab, viewType === "week" && styles.activeTab]} onClick={() => onViewTypeChange("week")}>
-            週
-          </div>
-          <div css={[styles.tab, viewType === "month" && styles.activeTab]} onClick={() => onViewTypeChange("month")}>
-            月
-          </div>
-          <div css={[styles.tab, viewType === "year" && styles.activeTab]} onClick={() => onViewTypeChange("year")}>
-            年
-          </div>
-        </div>
-
-        <div css={styles.navigationContainer}>
-          <button css={styles.navButton} onClick={() => onNavigateDate("prev")} disabled={isLoadingPrev || !hasPrevData}>
-            前へ
-          </button>
-          <div css={styles.currentDateDisplay}>{getCurrentDateDisplay()}</div>
-          <button css={styles.navButton} onClick={() => onNavigateDate("next")} disabled={isLoadingNext || !hasNextData}>
-            次へ
-          </button>
-        </div>
-
-        <div css={styles.chartContainer}>
-          <div css={styles.loading}>データを読み込んでいます...</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!data || data.length === 0) {
-    return (
-      <div css={styles.container}>
-        <div css={styles.header}>
-          <svg css={styles.headerIcon} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-            <polygon fill="var(--accent)" points="88.2 6.5 23.7 71 43.6 71 88.2 26.4 88.2 6.5" />
-          </svg>
-          電気使用量グラフ
-        </div>
-
-        <div css={styles.tabs}>
-          <div css={[styles.tab, viewType === "day" && styles.activeTab]} onClick={() => onViewTypeChange("day")}>
-            日
-          </div>
-          <div css={[styles.tab, viewType === "week" && styles.activeTab]} onClick={() => onViewTypeChange("week")}>
-            週
-          </div>
-          <div css={[styles.tab, viewType === "month" && styles.activeTab]} onClick={() => onViewTypeChange("month")}>
-            月
-          </div>
-          <div css={[styles.tab, viewType === "year" && styles.activeTab]} onClick={() => onViewTypeChange("year")}>
-            年
-          </div>
-        </div>
-
-        <div css={styles.navigationContainer}>
-          <button css={styles.navButton} onClick={() => onNavigateDate("prev")} disabled={isLoadingPrev || !hasPrevData}>
-            前へ
-          </button>
-          <div css={styles.currentDateDisplay}>{getCurrentDateDisplay()}</div>
-          <button css={styles.navButton} onClick={() => onNavigateDate("next")} disabled={isLoadingNext || !hasNextData}>
-            次へ
-          </button>
-        </div>
-
-        <div css={styles.totalUsageWrapper}>
-          <span css={styles.totalUsage}>合計: {totalUsage.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh</span>
-        </div>
-
-        <div css={styles.chartContainer}>
-          <div css={styles.noData}>データがありません</div>
-        </div>
-      </div>
-    );
+    chartContent = <div css={styles.loading}>データを読み込んでいます...</div>;
+  } else if (!data || data.length === 0) {
+    chartContent = <div css={styles.noData}>データがありません</div>;
+  } else {
+    chartContent = <svg ref={svgRef} width="100%" height="100%" style={{ minHeight: "350px" }}></svg>;
   }
 
   return (
     <div css={styles.container}>
-      <div css={styles.header}>
-        <svg css={styles.headerIcon} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-          <polygon fill="var(--accent)" points="88.2 6.5 23.7 71 43.6 71 88.2 26.4 88.2 6.5" />
-        </svg>
-        電気使用量グラフ
-      </div>
+      <div css={styles.header}>電気使用量グラフ</div>
 
-      <div css={styles.tabs}>
-        <div css={[styles.tab, viewType === "day" && styles.activeTab]} onClick={() => onViewTypeChange("day")}>
-          日
+      <div css={styles.tabAndNavContainer}>
+        <div css={styles.tabs}>
+          <div css={[styles.tab, viewType === "day" && styles.activeTab]} onClick={() => onViewTypeChange("day")}>
+            日
+          </div>
+          <div css={[styles.tab, viewType === "week" && styles.activeTab]} onClick={() => onViewTypeChange("week")}>
+            週
+          </div>
+          <div css={[styles.tab, viewType === "month" && styles.activeTab]} onClick={() => onViewTypeChange("month")}>
+            月
+          </div>
+          <div css={[styles.tab, viewType === "year" && styles.activeTab]} onClick={() => onViewTypeChange("year")}>
+            年
+          </div>
         </div>
-        <div css={[styles.tab, viewType === "week" && styles.activeTab]} onClick={() => onViewTypeChange("week")}>
-          週
-        </div>
-        <div css={[styles.tab, viewType === "month" && styles.activeTab]} onClick={() => onViewTypeChange("month")}>
-          月
-        </div>
-        <div css={[styles.tab, viewType === "year" && styles.activeTab]} onClick={() => onViewTypeChange("year")}>
-          年
+        <div css={styles.navButtonsWrapper}>
+          <button css={styles.navButton} onClick={() => onNavigateDate("prev")} disabled={isLoadingPrev || !hasPrevData}>
+            {"<"}
+          </button>
+          <button css={styles.navButton} onClick={() => onNavigateDate("next")} disabled={isLoadingNext || !hasNextData}>
+            {">"}
+          </button>
         </div>
       </div>
 
       <div css={styles.navigationContainer}>
-        <button css={styles.navButton} onClick={() => onNavigateDate("prev")} disabled={isLoadingPrev || !hasPrevData}>
-          前へ
-        </button>
-        <div css={styles.currentDateDisplay}>{getCurrentDateDisplay()}</div>
-        <button css={styles.navButton} onClick={() => onNavigateDate("next")} disabled={isLoadingNext || !hasNextData}>
-          次へ
-        </button>
+        <div css={styles.dateDisplayWrapper}>
+          <div css={styles.currentDateDisplay}>{getCurrentDateDisplay()}</div>
+        </div>
       </div>
 
-      <div css={styles.totalUsageWrapper}>
-        <span css={styles.totalUsage}>合計: {totalUsage.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh</span>
-      </div>
+      {data && data.length > 0 && (
+        <div css={styles.totalUsageWrapper}>
+          <span css={styles.totalUsage}>合計: {totalUsage.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh</span>
+        </div>
+      )}
 
-      <div css={styles.chartContainer} ref={containerRef}>
-        <svg
-          ref={svgRef}
-          width="100%"
-          height="100%"
-          style={{ minWidth: "600px", minHeight: "350px" }} // 明示的な最小サイズを設定
-        ></svg>
+      <div css={styles.chartContainer} ref={!isLoading && data && data.length > 0 ? containerRef : undefined}>
+        {chartContent}
       </div>
     </div>
   );

@@ -356,11 +356,6 @@ const ElectricityUsageDashboard = ({ accountNumber, isLoggedIn }: ElectricityUsa
 
   return (
     <>
-      {/* App.tsxのformContainer関連のUIはここに移動する想定だったが、
-          現状のApp.tsxには具体的なフォームUIがないため、一旦チャートのみ表示する。
-          もし日付範囲選択などのUIを復活させる場合は、ここに実装する。
-          <div css={styles.formContainer}> ... </div>
-      */}
       <ElectricityUsageChart
         key={`chart-${viewType}-${currentDate.getTime()}-${usageData.length}`}
         data={usageData}
