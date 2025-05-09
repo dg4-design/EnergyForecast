@@ -38,70 +38,81 @@ const styles = {
     width: 100%;
     max-width: 800px;
     margin: 0 auto;
-    padding: 24px;
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: var(--space-6);
+    background-color: var(--background-card);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-light);
   `,
   header: css`
-    margin-bottom: 20px;
-    font-size: 20px;
-    font-weight: bold;
-    color: #333;
+    margin-bottom: var(--space-5);
+    font-size: var(--text-xl);
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  `,
+  headerIcon: css`
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
   `,
   noData: css`
     text-align: center;
-    color: #555;
-    padding: 32px 16px;
-    background-color: #f0f3f5;
-    border-radius: 6px;
+    color: var(--text-secondary);
+    padding: var(--space-8) var(--space-4);
+    background-color: var(--gray-50);
+    border-radius: var(--radius);
     margin: 0;
     height: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 16px;
+    font-size: var(--text-base);
+    border: 1px dashed var(--gray-200);
   `,
   loading: css`
     text-align: center;
-    color: #555;
-    padding: 32px 16px;
-    background-color: #f0f3f5;
-    border-radius: 6px;
+    color: var(--text-secondary);
+    padding: var(--space-8) var(--space-4);
+    background-color: var(--gray-50);
+    border-radius: var(--radius);
     margin: 0;
     height: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 16px;
+    font-size: var(--text-base);
   `,
   tabs: css`
     display: flex;
-    margin-bottom: 24px;
-    border-bottom: 1px solid #dee2e6;
+    margin-bottom: var(--space-6);
+    border-bottom: 1px solid var(--border);
   `,
   tab: css`
-    padding: 10px 16px;
+    padding: var(--space-2) var(--space-4);
     cursor: pointer;
-    margin-right: 8px;
+    margin-right: var(--space-2);
     border: 1px solid transparent;
     border-bottom: none;
-    border-radius: 6px 6px 0 0;
-    color: #495057;
-    transition: color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+    border-radius: var(--radius) var(--radius) 0 0;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+    font-size: var(--text-sm);
 
     &:hover {
-      background-color: #f8f9fa;
-      color: #007bff;
+      background-color: var(--gray-50);
+      color: var(--accent);
     }
   `,
   activeTab: css`
-    color: #007bff;
-    font-weight: bold;
-    border-color: #dee2e6 #dee2e6 transparent;
+    color: var(--accent);
+    font-weight: 600;
+    border-color: var(--border) var(--border) transparent;
     border-top-width: 2px;
-    border-top-color: #3498db;
-    background-color: white;
+    border-top-color: var(--accent);
+    background-color: var(--background-card);
     position: relative;
     bottom: -1px;
   `,
@@ -114,24 +125,51 @@ const styles = {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 16px;
+    margin-bottom: var(--space-4);
   `,
   navButton: css`
-    padding: 8px 16px;
-    background-color: #e9ecef;
-    color: #495057;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
+    padding: var(--space-2) var(--space-4);
+    background-color: var(--background);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     cursor: pointer;
-    font-size: 14px;
-    &:hover {
-      background-color: #ced4da;
+    font-size: var(--text-sm);
+    transition: all var(--transition-fast);
+    height: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover:not(:disabled) {
+      background-color: var(--gray-100);
+      border-color: var(--gray-300);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
   `,
   currentDateDisplay: css`
-    font-size: 16px;
-    font-weight: bold;
-    color: #333;
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--text-primary);
+  `,
+  totalUsage: css`
+    text-align: center;
+    margin-bottom: var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--text-on-accent);
+    background-color: var(--accent);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius);
+    display: inline-block;
+    font-weight: 500;
+  `,
+  totalUsageWrapper: css`
+    text-align: center;
+    margin-bottom: var(--space-4);
   `,
 };
 
@@ -532,9 +570,9 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
       // X軸を描画
       const xAxisGroup = g.append("g").attr("transform", `translate(0,${innerHeight})`).call(xAxis);
 
-      xAxisGroup.selectAll("path").style("stroke", "#ccd1d9");
-      xAxisGroup.selectAll("line").style("stroke", "#ccd1d9");
-      xAxisGroup.selectAll("text").style("fill", "#555").style("font-size", "11px");
+      xAxisGroup.selectAll("path").style("stroke", "var(--gray-300)");
+      xAxisGroup.selectAll("line").style("stroke", "var(--gray-300)");
+      xAxisGroup.selectAll("text").style("fill", "var(--text-secondary)").style("font-size", "var(--text-xs)");
 
       // Y軸の描画
       const yAxisGroup = g.append("g").call(
@@ -551,7 +589,7 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
               formattedValue = d3.format(".1f")(d);
               break;
             case "month":
-              // 月表示では整数
+              // 月表示では小数点以下1桁
               formattedValue = d3.format(".1f")(d);
               break;
             case "year":
@@ -565,9 +603,9 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
         })
       );
 
-      yAxisGroup.selectAll("path").style("stroke", "#ccd1d9");
-      yAxisGroup.selectAll("line").style("stroke", "#ccd1d9");
-      yAxisGroup.selectAll("text").style("fill", "#555").style("font-size", "11px");
+      yAxisGroup.selectAll("path").style("stroke", "var(--gray-300)");
+      yAxisGroup.selectAll("line").style("stroke", "var(--gray-300)");
+      yAxisGroup.selectAll("text").style("fill", "var(--text-secondary)").style("font-size", "var(--text-xs)");
 
       // Y軸のグリッド線を追加
       g.append("g")
@@ -579,19 +617,9 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
             .tickFormat(() => "")
         )
         .selectAll("line")
-        .style("stroke", "#e9ecef")
+        .style("stroke", "var(--gray-100)")
         .style("stroke-dasharray", "2,2");
       g.selectAll("path.domain").remove();
-
-      // タイトルの描画
-      svg
-        .append("text")
-        .attr("x", width / 2)
-        .attr("y", margin.top)
-        .attr("text-anchor", "middle")
-        .style("font-size", "18px")
-        .style("font-weight", "bold")
-        .style("fill", "#333");
 
       // ツールチップグループを最後に作成（最前面に表示されるようにするため）
       const tooltip = svg.append("g").attr("class", "tooltip").style("display", "none").attr("pointer-events", "none");
@@ -601,20 +629,20 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
         .append("rect")
         .attr("width", 180)
         .attr("height", 65)
-        .attr("fill", "#ffffff")
-        .attr("stroke", "#dee2e6")
+        .attr("fill", "var(--background-card)")
+        .attr("stroke", "var(--border)")
         .attr("stroke-width", 1)
         .attr("rx", 6)
         .attr("ry", 6)
         .attr("y", -70)
         .attr("x", -90)
-        .style("box-shadow", "0 1px 3px rgba(0,0,0,0.1)");
+        .style("box-shadow", "var(--shadow)");
 
       // ラベルテキスト
-      const tooltipLabel = tooltip.append("text").attr("x", -80).attr("y", -48).style("font-size", "13px").style("font-weight", "bold").style("fill", "#333");
+      const tooltipLabel = tooltip.append("text").attr("x", -80).attr("y", -48).style("font-size", "var(--text-sm)").style("font-weight", "500").style("fill", "var(--text-primary)");
 
       // 値テキスト
-      const tooltipValue = tooltip.append("text").attr("x", -80).attr("y", -28).style("font-size", "13px").style("fill", "#555");
+      const tooltipValue = tooltip.append("text").attr("x", -80).attr("y", -28).style("font-size", "var(--text-sm)").style("fill", "var(--text-secondary)");
 
       // ツールチップの表示関数
       const showTooltip = (event: any, d: DataPoint) => {
@@ -651,13 +679,13 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
           .style("display", "block");
 
         // バーの色を変更してハイライト
-        d3.select(event.target).transition().duration(100).attr("fill", "#2980b9");
+        d3.select(event.target).transition().duration(100).attr("fill", "var(--accent-dark)");
       };
 
       // ツールチップを隠す関数
       const hideTooltip = (event: any) => {
         tooltip.style("display", "none");
-        d3.select(event.target).transition().duration(100).attr("fill", "#3498db");
+        d3.select(event.target).transition().duration(100).attr("fill", "var(--accent)");
       };
 
       // 棒グラフの描画
@@ -689,9 +717,9 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
             const value = Number(dataPoint.value) || 0;
             return innerHeight - y(value);
           })
-          .attr("fill", "#3498db")
-          .attr("rx", 3)
-          .attr("ry", 3)
+          .attr("fill", "var(--accent)")
+          .attr("rx", 4)
+          .attr("ry", 4)
           .style("cursor", "pointer")
           .on("mouseover", (event, label) => {
             const dataPoint = dataMap.get(label);
@@ -715,9 +743,9 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
             const value = Number(d.value) || 0;
             return innerHeight - y(value);
           })
-          .attr("fill", "#3498db")
-          .attr("rx", 3)
-          .attr("ry", 3)
+          .attr("fill", "var(--accent)")
+          .attr("rx", 4)
+          .attr("ry", 4)
           .style("cursor", "pointer")
           .on("mouseover", showTooltip)
           .on("mouseout", hideTooltip);
@@ -728,7 +756,12 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
   if (isLoading) {
     return (
       <div css={styles.container}>
-        <div css={styles.header}>電気使用量グラフ</div>
+        <div css={styles.header}>
+          <svg css={styles.headerIcon} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+            <polygon fill="var(--accent)" points="88.2 6.5 23.7 71 43.6 71 88.2 26.4 88.2 6.5" />
+          </svg>
+          電気使用量グラフ
+        </div>
 
         <div css={styles.tabs}>
           <div css={[styles.tab, viewType === "day" && styles.activeTab]} onClick={() => onViewTypeChange("day")}>
@@ -765,7 +798,12 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
   if (!data || data.length === 0) {
     return (
       <div css={styles.container}>
-        <div css={styles.header}>電気使用量グラフ</div>
+        <div css={styles.header}>
+          <svg css={styles.headerIcon} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+            <polygon fill="var(--accent)" points="88.2 6.5 23.7 71 43.6 71 88.2 26.4 88.2 6.5" />
+          </svg>
+          電気使用量グラフ
+        </div>
 
         <div css={styles.tabs}>
           <div css={[styles.tab, viewType === "day" && styles.activeTab]} onClick={() => onViewTypeChange("day")}>
@@ -792,15 +830,8 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
           </button>
         </div>
 
-        <div
-          css={css`
-            text-align: center;
-            margin-bottom: 10px;
-            font-size: 14px;
-            color: #333;
-          `}
-        >
-          合計: {totalUsage.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh
+        <div css={styles.totalUsageWrapper}>
+          <span css={styles.totalUsage}>合計: {totalUsage.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh</span>
         </div>
 
         <div css={styles.chartContainer}>
@@ -812,7 +843,12 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
 
   return (
     <div css={styles.container}>
-      <div css={styles.header}>電気使用量グラフ</div>
+      <div css={styles.header}>
+        <svg css={styles.headerIcon} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+          <polygon fill="var(--accent)" points="88.2 6.5 23.7 71 43.6 71 88.2 26.4 88.2 6.5" />
+        </svg>
+        電気使用量グラフ
+      </div>
 
       <div css={styles.tabs}>
         <div css={[styles.tab, viewType === "day" && styles.activeTab]} onClick={() => onViewTypeChange("day")}>
@@ -839,15 +875,8 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
         </button>
       </div>
 
-      <div
-        css={css`
-          text-align: center;
-          margin-bottom: 10px;
-          font-size: 14px;
-          color: #333;
-        `}
-      >
-        {totalUsage.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh
+      <div css={styles.totalUsageWrapper}>
+        <span css={styles.totalUsage}>合計: {totalUsage.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh</span>
       </div>
 
       <div css={styles.chartContainer} ref={containerRef}>

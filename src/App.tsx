@@ -13,26 +13,70 @@ const styles = {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-    background-color: #f4f7f9;
+    background-color: var(--background);
   `,
   header: css`
-    background-color: #ffffff;
-    padding: 20px 32px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    text-align: center;
+    background-color: var(--background-card);
+    padding: var(--space-4) var(--space-8);
+    box-shadow: var(--shadow);
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+
+    @media (max-width: 768px) {
+      padding: var(--space-3) var(--space-4);
+    }
+  `,
+  headerContent: css`
+    max-width: 1200px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `,
+  logoContainer: css`
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  `,
+  logo: css`
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+
+    @media (max-width: 768px) {
+      width: 28px;
+      height: 28px;
+    }
   `,
   title: css`
-    font-size: 28px;
-    font-weight: bold;
-    color: #333;
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    color: var(--text-primary);
     margin: 0;
+    letter-spacing: -0.025em;
+    background: linear-gradient(135deg, var(--teal-400) 0%, var(--teal-700) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    position: relative;
+
+    @media (max-width: 768px) {
+      font-size: var(--text-xl);
+    }
   `,
   mainContent: css`
     flex-grow: 1;
     max-width: 1200px;
     width: 100%;
-    margin: 32px auto;
-    padding: 0 16px;
+    margin: var(--space-8) auto;
+    padding: 0 var(--space-4);
+
+    @media (max-width: 768px) {
+      margin: var(--space-4) auto;
+      padding: 0 var(--space-3);
+    }
   `,
   // formContainer, dateRangeSelector, dateInputContainer, dateLabel, dateInput, button, statusMessage, loginMessage は移動したので削除
 };
@@ -90,7 +134,15 @@ const App = () => {
   return (
     <div css={styles.container}>
       <header css={styles.header}>
-        <h1 css={styles.title}>EnergyForecast</h1>
+        <div css={styles.headerContent}>
+          <div css={styles.logoContainer}>
+            <svg css={styles.logo} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+              <polygon fill="var(--accent)" points="88.2 6.5 23.7 71 43.6 71 88.2 26.4 88.2 6.5" />
+              <polygon fill="var(--accent)" points="84.4 57 39.8 101.6 39.8 121.5 104.3 57 84.4 57" />
+            </svg>
+            <h1 css={styles.title}>EnergyForecast</h1>
+          </div>
+        </div>
       </header>
       <main css={styles.mainContent}>
         <LoginStatusDisplay isLoginLoading={isLoginLoading} isLoggedIn={isLoggedIn} />

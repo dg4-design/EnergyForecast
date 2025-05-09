@@ -16,83 +16,114 @@ interface MonthlyUsageForecastProps {
 
 const styles = {
   forecastContainer: css`
-    margin-top: 24px;
+    margin-top: var(--space-6);
     width: 100%;
     max-width: 800px;
     margin-left: auto;
     margin-right: auto;
-    padding: 20px;
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: var(--space-6);
+    background-color: var(--background-card);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-light);
   `,
   sectionTitle: css`
-    font-size: 18px;
-    font-weight: bold;
-    margin-bottom: 16px;
-    color: #333;
+    font-size: var(--text-lg);
+    font-weight: 600;
+    margin-bottom: var(--space-4);
+    color: var(--text-primary);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
+  `,
+  titleIcon: css`
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
   `,
   forecastContent: css`
     display: flex;
     flex-direction: row;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--space-4);
     flex-wrap: wrap;
+    margin-bottom: var(--space-6);
   `,
   forecastItem: css`
     display: flex;
     flex-direction: column;
     flex: 1;
     min-width: 200px;
-    padding: 12px 16px;
-    background-color: #f8f9fa;
-    border-radius: 6px;
+    padding: var(--space-4) var(--space-5);
+    background-color: var(--gray-50);
+    border-radius: var(--radius);
     align-items: center;
     text-align: center;
+    border: 1px solid var(--border-light);
+    transition: transform var(--transition-fast);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-sm);
+    }
   `,
   forecastLabel: css`
     font-weight: 500;
-    color: #495057;
-    margin-bottom: 8px;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-2);
+    font-size: var(--text-sm);
   `,
   forecastValue: css`
-    font-weight: bold;
-    color: #0062cc;
+    font-weight: 600;
+    color: var(--accent);
+    font-size: var(--text-xl);
   `,
   forecastDescription: css`
-    margin-top: 12px;
-    font-size: 14px;
-    color: #6c757d;
-    line-height: 1.5;
+    margin-top: var(--space-4);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.6;
+    background-color: var(--gray-50);
+    padding: var(--space-4);
+    border-radius: var(--radius);
+    border: 1px solid var(--border-light);
   `,
   loading: css`
-    color: #6c757d;
+    color: var(--text-secondary);
     text-align: center;
-    padding: 20px;
+    padding: var(--space-6);
   `,
   progressContainer: css`
-    margin-top: 16px;
-    background-color: #e9ecef;
-    height: 12px;
-    border-radius: 6px;
+    margin-top: var(--space-4);
+    background-color: var(--gray-100);
+    height: 10px;
+    border-radius: var(--radius-full);
     position: relative;
     overflow: hidden;
   `,
   progressBar: css`
     height: 100%;
-    background-color: #0062cc;
-    border-radius: 6px;
-    transition: width 0.3s ease;
+    background-color: var(--accent);
+    border-radius: var(--radius-full);
+    transition: width 0.4s ease;
   `,
   progressLabel: css`
-    margin-top: 8px;
+    margin-top: var(--space-2);
     display: flex;
     justify-content: space-between;
-    font-size: 13px;
-    color: #6c757d;
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+  `,
+  monthLabel: css`
+    display: inline-flex;
+    align-items: center;
+    background-color: var(--teal-100);
+    color: var(--teal-700);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-full);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    margin-left: var(--space-2);
   `,
 };
 
@@ -158,7 +189,12 @@ const MonthlyUsageForecast = ({ data, currentDate, isLoading }: MonthlyUsageFore
   if (isLoading) {
     return (
       <div css={styles.forecastContainer}>
-        <h3 css={styles.sectionTitle}>月間使用量予測</h3>
+        <h3 css={styles.sectionTitle}>
+          <svg css={styles.titleIcon} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+            <polygon fill="var(--accent)" points="84.4 57 39.8 101.6 39.8 121.5 104.3 57 84.4 57" />
+          </svg>
+          月間使用量予測
+        </h3>
         <div css={styles.loading}>読み込み中...</div>
       </div>
     );
@@ -167,7 +203,12 @@ const MonthlyUsageForecast = ({ data, currentDate, isLoading }: MonthlyUsageFore
   if (!forecastData) {
     return (
       <div css={styles.forecastContainer}>
-        <h3 css={styles.sectionTitle}>月間使用量予測</h3>
+        <h3 css={styles.sectionTitle}>
+          <svg css={styles.titleIcon} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+            <polygon fill="var(--accent)" points="84.4 57 39.8 101.6 39.8 121.5 104.3 57 84.4 57" />
+          </svg>
+          月間使用量予測
+        </h3>
         <div css={styles.forecastDescription}>データが不足しているため、予測を計算できません。</div>
       </div>
     );
@@ -178,8 +219,11 @@ const MonthlyUsageForecast = ({ data, currentDate, isLoading }: MonthlyUsageFore
   return (
     <div css={styles.forecastContainer}>
       <h3 css={styles.sectionTitle}>
-        <span>月間使用量予測</span>
-        <span>({monthName})</span>
+        <svg css={styles.titleIcon} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+          <polygon fill="var(--accent)" points="84.4 57 39.8 101.6 39.8 121.5 104.3 57 84.4 57" />
+        </svg>
+        月間使用量予測
+        <span css={styles.monthLabel}>{monthName}</span>
       </h3>
 
       <div css={styles.forecastContent}>

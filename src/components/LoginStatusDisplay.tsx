@@ -3,24 +3,38 @@ import { css } from "@emotion/react";
 const styles = {
   statusMessage: css`
     text-align: center;
-    margin: 20px 0;
-    padding: 16px;
-    border-radius: 6px;
-    font-size: 16px;
-    color: #555;
-    background-color: #e9edf0;
+    margin: var(--space-5) 0;
+    padding: var(--space-4);
+    border-radius: var(--radius);
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    background-color: var(--blue-50);
+    border: 1px solid var(--blue-200);
+    box-shadow: var(--shadow-sm);
   `,
   loginMessage: css`
     text-align: center;
-    margin: 40px auto;
-    padding: 24px;
-    border-radius: 8px;
+    margin: var(--space-10) auto;
+    padding: var(--space-6);
+    border-radius: var(--radius-md);
     max-width: 500px;
-    background-color: #ffffff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    color: #333;
-    font-size: 16px;
+    background-color: var(--background-card);
+    box-shadow: var(--shadow);
+    color: var(--text-primary);
+    font-size: var(--text-base);
     line-height: 1.6;
+    border: 1px solid var(--border-light);
+  `,
+  code: css`
+    display: inline-block;
+    background-color: var(--gray-100);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: var(--text-sm);
+    color: var(--primary);
+    margin: 0 var(--space-1);
+    border: 1px solid var(--border);
   `,
 };
 
@@ -37,7 +51,7 @@ const LoginStatusDisplay = ({ isLoginLoading, isLoggedIn }: LoginStatusDisplayPr
     return (
       <div css={styles.loginMessage}>
         ログインするには環境変数に
-        <code>VITE_EMAIL</code>、<code>VITE_PASSWORD</code>、<code>VITE_ACCOUNT_NUMBER</code>
+        <code css={styles.code}>VITE_EMAIL</code>、<code css={styles.code}>VITE_PASSWORD</code>、<code css={styles.code}>VITE_ACCOUNT_NUMBER</code>
         を設定してください。
         <br />
         設定後、アプリケーションを再読み込みしてください。
