@@ -355,9 +355,6 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
 
     const formattedData = formatData();
 
-    // デバッグ: 処理されたデータの確認
-    console.log("Formatted data:", formattedData);
-
     // SVGをクリア
     d3.select(svgRef.current).selectAll("*").remove();
 
@@ -611,15 +608,9 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
       // キーを保持するマップを作成
       const dataMap = new Map();
 
-      // デバッグのためにログ出力
-      console.log("Formatted data:", formattedData);
-
       formattedData.forEach((d) => {
         dataMap.set(d.label, d);
       });
-
-      console.log("Data map keys:", [...dataMap.keys()]);
-      console.log("xLabels:", xLabels);
 
       g.selectAll<SVGRectElement, string>(".bar")
         .data(xLabels)
