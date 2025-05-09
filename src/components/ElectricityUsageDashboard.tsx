@@ -1,32 +1,8 @@
-import { css } from "@emotion/react";
 import { useState, useEffect, useCallback } from "react";
 import ElectricityUsageChart, { ViewType } from "./ElectricityUsageChart"; // 同じディレクトリなのでパスを調整
 import { apiService, HalfHourlyReading } from "../services/api"; // api.ts の場所に合わせて調整
 import { getNowJST } from "../utils/dateUtils";
 import { startOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addDays, subMonths, addMonths, subYears, addYears, addWeeks, subWeeks } from "date-fns";
-
-const styles = {
-  // App.tsxから移動するスタイル (formContainer, dateRangeSelector, dateInputContainer, dateLabel, dateInput, buttonなど)
-  // 必要に応じてApp.tsxのものをベースに調整・追加する
-  formContainer: css`
-    background-color: #ffffff;
-    padding: 24px;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    margin-bottom: 32px;
-  `,
-  // ... (App.tsxのstylesオブジェクトから関連するスタイルをここに移動・調整)
-  statusMessage: css`
-    // これはデータロード中のメッセージ用
-    text-align: center;
-    margin: 20px 0;
-    padding: 16px;
-    border-radius: 6px;
-    font-size: 16px;
-    color: #555;
-    background-color: #e9edf0;
-  `,
-};
 
 // ヘルパー関数: 指定された日付とビュータイプに基づいて次の日付を計算
 const calculateNextDate = (date: Date, viewType: ViewType): Date => {
