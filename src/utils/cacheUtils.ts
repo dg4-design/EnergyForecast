@@ -54,7 +54,7 @@ export class CacheService {
   /**
    * JSON.parseで使用するリバイバー関数（日付文字列をDateオブジェクトに変換）
    */
-  private dateReviver(key: string, value: any): any {
+  private dateReviver(value: any): any {
     // ISO形式の日付文字列を検出してDateオブジェクトに変換
     if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(value)) {
       return new Date(value);
@@ -119,8 +119,6 @@ export class CacheService {
 
     const now = Date.now();
     const age = now - cachedItem.timestamp;
-    const expiresIn = this.defaultOptions.expirationTime - age;
-    const expiresInMinutes = Math.floor(expiresIn / (60 * 1000));
 
     if (age > this.defaultOptions.expirationTime) {
       // キャッシュが期限切れの場合は削除
@@ -138,7 +136,6 @@ export class CacheService {
    * @param data 保存するデータ
    */
   set<T>(key: string, data: T): void {
-    const dataSize = JSON.stringify(data).length;
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
@@ -212,23 +209,6 @@ export class CacheService {
     });
 
     console.log(`キャッシュ状況: ${totalKeys}個のキー, 合計サイズ: ${this.formatSize(totalSize)}`);
-  }
-
-  /**
-   * 経過時間を人間が読みやすい形式にフォーマットします
-   */
-  private formatAge(ms: number): string {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-
-    if (hours > 0) {
-      return `${hours}時間${minutes % 60}分`;
-    } else if (minutes > 0) {
-      return `${minutes}分${seconds % 60}秒`;
-    } else {
-      return `${seconds}秒`;
-    }
   }
 
   /**
