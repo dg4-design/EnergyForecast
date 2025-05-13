@@ -83,17 +83,9 @@ const styles = {
   `,
   navigationContainer: css`
     display: flex;
-    justify-content: center;
-    align-items: center;
     margin-bottom: var(--space-4);
   `,
-  dateDisplayWrapper: css`
-    display: flex;
-    align-items: center;
-  `,
   navButtonsWrapper: css`
-    display: flex;
-    align-items: center;
     gap: var(--space-3);
   `,
   navButton: css`
@@ -126,18 +118,14 @@ const styles = {
     color: var(--text-primary);
   `,
   totalUsage: css`
-    text-align: center;
     margin-bottom: var(--space-3);
-    font-size: var(--text-sm);
-    color: var(--text-on-accent);
-    background-color: var(--accent);
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius);
     display: inline-block;
-    font-weight: 500;
+    font-weight: 700;
+  `,
+  totalUsageNumber: css`
+    font-size: var(--text-2xl);
   `,
   totalUsageWrapper: css`
-    text-align: center;
     margin-bottom: var(--space-4);
   `,
 };
@@ -769,14 +757,14 @@ const ElectricityUsageChart = ({ data, isLoading, viewType, currentDate, onViewT
       </div>
 
       <div css={styles.navigationContainer}>
-        <div css={styles.dateDisplayWrapper}>
-          <div css={styles.currentDateDisplay}>{getCurrentDateDisplay()}</div>
-        </div>
+        <div css={styles.currentDateDisplay}>{getCurrentDateDisplay()}</div>
       </div>
 
       {data && data.length > 0 && (
         <div css={styles.totalUsageWrapper}>
-          <span css={styles.totalUsage}>合計: {totalUsage.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh</span>
+          <span css={styles.totalUsage}>
+            <span css={styles.totalUsageNumber}>{totalUsage.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> kWh
+          </span>
         </div>
       )}
 

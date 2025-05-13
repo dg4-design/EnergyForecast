@@ -43,3 +43,21 @@ npm run dev
 - Vite
 - Chart.js
 - Emotion (CSS-in-JS)
+
+## ビルド手順
+
+本番環境用にアプリケーションをビルドするには、以下の手順を実行してください：
+
+1. 本番用ビルドを作成:
+
+```bash
+npm run build
+```
+
+2. ビルドされたファイルは `dist` ディレクトリに生成されます。
+
+3. 本番ビルドをローカルでプレビューする場合:
+
+```bash
+npm run preview
+```

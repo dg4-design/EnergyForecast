@@ -111,8 +111,37 @@ const MonthlyUsageForecast = ({ data, currentDate, isLoading }: MonthlyUsageFore
     // 今月の合計使用量を計算
     const currentTotal = currentMonthData.reduce((sum, reading) => sum + (Number(reading.value) || 0), 0);
 
-    // 1日あたりの平均使用量を計算（今日までのデータで）
-    const dailyAverage = currentDay > 0 ? currentTotal / currentDay : 0;
+    // 日別使用量を計算
+    const dailyUsage: { [key: string]: number } = {};
+    currentMonthData.forEach((reading) => {
+      const readingDate = toJST(reading.startAt instanceof Date ? reading.startAt : new Date(reading.startAt));
+      const dateKey = format(readingDate, "yyyy-MM-dd");
+      if (!dailyUsage[dateKey]) {
+        dailyUsage[dateKey] = 0;
+      }
+      dailyUsage[dateKey] += Number(reading.value) || 0;
+    });
+
+    // 日別使用量の配列を作成
+    const dailyUsageArray = Object.values(dailyUsage);
+
+    let dailyAverage: number;
+
+    // データが6日間以上ある場合は中央値5つの平均を使用
+    if (dailyUsageArray.length >= 6) {
+      // 使用量の多い順にソート
+      const sortedDailyUsage = [...dailyUsageArray].sort((a, b) => b - a);
+
+      // 中央の5つの値を取得（インデックス計算）
+      const startIndex = Math.floor((sortedDailyUsage.length - 5) / 2);
+      const middleFiveValues = sortedDailyUsage.slice(startIndex, startIndex + 5);
+
+      // 中央値5つの平均を計算
+      dailyAverage = middleFiveValues.reduce((sum, value) => sum + value, 0) / 5;
+    } else {
+      // 5日間以下の場合は単純平均
+      dailyAverage = currentDay > 0 ? currentTotal / currentDay : 0;
+    }
 
     // 月全体の予測使用量を計算
     const monthlyForecast = dailyAverage * daysInMonth;
@@ -151,7 +180,7 @@ const MonthlyUsageForecast = ({ data, currentDate, isLoading }: MonthlyUsageFore
         <div css={styles.forecastContent}>
           <div css={styles.forecastItem}>
             <span css={styles.forecastLabel}>日平均使用量</span>
-            <span css={styles.forecastValue}>{forecastData.dailyAverage.toFixed(2)} kWh/日</span>
+            <span css={styles.forecastValue}>{forecastData.dailyAverage.toFixed(2)} kWh</span>
           </div>
 
           <div css={styles.forecastItem}>
@@ -166,7 +195,7 @@ const MonthlyUsageForecast = ({ data, currentDate, isLoading }: MonthlyUsageFore
         </div>
 
         <div css={styles.forecastDescription}>
-          {monthName}の最初から今日までの平均使用量を元に、月末までの合計使用量を予測しています。
+          今月の使用量データから、月末までの合計使用量を予測しています。
           <br />
           予測使用料金は{ELECTRICITY_RATE}円/kWhで計算しています。
           <br />
