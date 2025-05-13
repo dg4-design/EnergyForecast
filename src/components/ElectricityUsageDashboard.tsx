@@ -46,7 +46,7 @@ export interface ElectricityUsageDashboardProps {
 const ElectricityUsageDashboard = ({ accountNumber, isLoggedIn }: ElectricityUsageDashboardProps) => {
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [usageData, setUsageData] = useState<HalfHourlyReading[]>([]);
-  const [viewType, setViewType] = useState<ViewType>("day");
+  const [viewType, setViewType] = useState<ViewType>("month");
   const [currentDate, setCurrentDate] = useState(getNowJST());
   const [displayedDate, setDisplayedDate] = useState<Date | null>(null);
   const [displayedViewType, setDisplayedViewType] = useState<ViewType | null>(null);
